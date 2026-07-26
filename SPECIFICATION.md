@@ -510,6 +510,7 @@ node_map
 node_fold
 node_do_while
 node_branch
+generic_processes
 python_script_processes
 scheduling_policies
 ```
@@ -526,6 +527,14 @@ kind: fold      -> node_fold
 kind: do_while  -> node_do_while
 kind: branch    -> node_branch
 ```
+
+A process with a `type_params` section requires:
+
+```text
+generic_processes
+```
+
+Feature derivation is performed on the expanded document body, so `generic_processes` is derived from a `type_params` section present after `$import` resolution. `$import` itself is a structural mechanism resolved before feature derivation (spec 2.2) and is not a feature.
 
 A `script` section with `script.language: python` requires:
 
@@ -605,6 +614,7 @@ workflow uses kind: map but implementation lacks node_map
 workflow uses kind: fold but implementation lacks node_fold
 workflow uses kind: do_while but implementation lacks node_do_while
 workflow uses kind: branch but implementation lacks node_branch
+workflow uses generic processes but implementation lacks generic_processes
 workflow uses scheduling policies but implementation lacks scheduling_policies
 workflow uses script.language: python but implementation lacks python_script_processes
 ```
@@ -1059,6 +1069,8 @@ Do not introduce `Plate<96WellPlate>` or other parameterized Object types in v0.
 ---
 
 ## 8. Generic Constraints
+
+Generic processes require the `generic_processes` feature (spec 4.2). A document requires the feature when any process declares a `type_params` section. An implementation that lacks `generic_processes` treats such a document as valid v0 but unsupported (spec 4.4) rather than instantiating it.
 
 Generic type parameters are written using `type_params`. Each type parameter declaration must specify a domain:
 
@@ -2806,7 +2818,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 60. Whitespace is allowed only immediately inside `Array` angle brackets, such as `Array< T >`; whitespace between `Array` and `<` is invalid.
 61. Type atoms must resolve to a built-in primitive type, a top-level user-defined type, or a type parameter declared by the current process. Type parameters must not shadow top-level user-defined type names or reserved built-in names.
 62. `Optional<T>`, `Result<T,E>`, union syntax, nullable suffixes such as `T?`, map types, tuple types, function types, and multiple type arguments are not valid v0 type expressions.
-63. Generic type parameters are declared with a required `domain` of either `data` or `object`.
+63. Generic type parameters are declared with a required `domain` of either `data` or `object`. A document that declares any `type_params` requires the `generic_processes` feature; `$import` is a pre-derivation structural mechanism and is not a feature.
 64. A `domain: data` type parameter may be instantiated only with a built-in primitive Data type or user-defined nominal Data type; a `domain: object` type parameter may be instantiated only with a user-defined atomic Object type.
 65. Type parameters are not instantiated with Array types; collection genericity is written as `Array<T>` or `Array<O>`.
 66. Generic type argument inference and `where` constraint validation are performed during graph validation and do not depend on runtime values.

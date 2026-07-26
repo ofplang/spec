@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">ofplang logo — white line, no outline, red disc, transparent outside</title>
+<desc id="desc">Two flow lines forming an O and an F. The O line loops and exits to the right; the F line rises and turns right. The F passes over the O and the O breaks at the crossing. Each line terminates in a filled token.</desc>
+<circle cx="256" cy="256" r="252" fill="#A81F24"/>
+<g transform="translate(35.6 86.6) scale(2.5)">
+<path d="M74 54 A32 32 0 1 0 76 73 H90" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+<path d="M118 73 H148" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+<circle cx="148" cy="73" r="11" fill="#FFFFFF"/>
+<path d="M104 123 V29 Q104 19 114 19 H148" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+<circle cx="148" cy="19" r="11" fill="#FFFFFF"/>
+</g>
+</svg>

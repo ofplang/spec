@@ -1,8 +1,8 @@
 # Object-flow Programming Language v0 Specification Current Draft
 
 Status: current working draft  
-Date: 2026-07-08  
-Based on: baseline 2026-07-01, with design resolutions through 2026-07-08, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, and scheduling-policy-schema resolutions
+Date: 2026-07-28  
+Based on: baseline 2026-07-01, with design resolutions through 2026-07-28, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, and descriptive-metadata resolutions
 
 This document is a self-contained current draft specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
@@ -85,6 +85,8 @@ The processing order is:
 v0 portable YAML is closed by default. At every defined mapping position, only keys explicitly defined by the v0 specification are allowed. Unknown keys are validation errors.
 
 Implementation extension keys are allowed only when they use the reserved extension-key prefix `x-`. A document containing `x-` extension keys is not strict portable v0 unless the validator is explicitly run in an extension-tolerant mode.
+
+The v0-defined optional `description` key (2.7) is allowed at the document root and at trait, type, and process definition mappings. It is a v0-defined key, not an extension key, so a document using `description` remains strict portable v0.
 
 The `scheduling.policies[*].prefer` payload has a v0-defined closed shape for v0-defined scheduling preference kinds. Unit strings inside scheduling preference payloads are implementation-defined strings in v0. Extension preference kinds and extension payload fields are allowed only in extension-tolerant mode when they use the reserved extension-key prefix `x-`.
 
@@ -174,6 +176,8 @@ ensures
 ```
 
 A validator may report a more specific error when a name fails the grammar for its syntactic position or conflicts with a reserved name.
+
+The name `description` is a v0-defined metadata key at certain definition mappings (2.7) but is not a reserved identifier name. It may be used as a user-defined process name, port name, node id, binding name, return name, view field name, type name, trait name, or type parameter name.
 
 
 ### 2.5 Type expression syntax
@@ -346,6 +350,29 @@ A source entry containing both `from` and `value`, or neither, is a validation e
 The condition output is an ordinary non-carry Data output for output-mode purposes. It may be exposed using `collect`, `last`, or `drop` when explicit `do_while.outputs` are present. If `do_while.outputs` is omitted, the condition output is dropped by default.
 
 Reference parsing and reference resolution are separate validation steps. A malformed reference is a validation error. A syntactically valid reference whose target does not exist is an unknown reference validation error. A reference that is not valid in its syntactic context is an invalid reference scope validation error. A reference whose resolved type or phase does not satisfy the target requirement is a type or phase validation error.
+
+### 2.7 Descriptive metadata
+
+A v0 document may attach optional human-readable descriptive metadata using the reserved `description` field.
+
+`description` is allowed only at the following definition mappings:
+
+```text
+the document root mapping
+a trait definition under traits.<TraitName>
+a type definition under types.<TypeName>
+a process definition under processes.<name>
+```
+
+At each of these positions, `description` is optional. If present, its value must be a YAML string scalar. UTF-8 text is allowed, including Japanese. A `null`, sequence, mapping, or non-string scalar value is a validation error, consistent with 2.3.
+
+`description` is metadata only. Like `spec_version` (2.1), it does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling policy handling, or runtime behavior. Two documents that differ only in `description` values are semantically identical.
+
+v0 does not define `description` on input ports, output ports, type parameters, view fields, nodes, bindings, contracts, scheduling policies, or any mapping position not listed above. The descriptive meaning of a port is expected to be documented in the enclosing process `description`, and the descriptive meaning of a view field in the enclosing type `description`. A `description` key at an undefined position is an unknown-key validation error under 2.3.
+
+Unlike the metadata keys `type`, `value`, and `phase`, the name `description` is intentionally not added to the reserved identifier list (2.4). Because `description` is meaningful only at the definition mappings listed above, it does not conflict with user-defined identifiers used elsewhere, such as a port named `description` or a view field named `description`.
+
+When `$import` resolution merges mappings, a `description` key is treated like any other key. A duplicate `description` at the same expanded mapping level after import resolution is a duplicate-key validation error (3.2, 3.3).
 
 ---
 
@@ -2840,3 +2867,4 @@ Implementations may report validation, portability, unsupported-feature, and ext
 82. Strict portable v0 uses only v0-defined syntax, keys, feature names, type syntax, process kinds, node kinds, script languages, and validation semantics.
 83. Extension-tolerant mode may accept `x-` extension keys and `x-` extension feature names, but unknown non-`x-` keys remain validation errors.
 84. v0 core validation does not accept implementation-defined type constructors, process kinds, node kinds, Object transform kinds, binding sections, output modes, or alternate generic inference semantics; such changes define an extended dialect.
+85. A v0 document may include optional human-readable `description` metadata at the document root and at trait, type, and process definitions. `description` must be a YAML string scalar, is not a reserved identifier name, and does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling, or runtime behavior.

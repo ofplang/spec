@@ -8,3 +8,9 @@ dataflow workflow IR with linear Object tracking.
 This repository is the single source of truth for the language. Tools in the
 [`ofplang`](https://github.com/ofplang) organization (validator, scheduler,
 runtime, …) target this spec.
+
+## License
+
+MIT ([LICENSE](LICENSE)) — the same terms as the organization's tool
+repositories, so an independent implementation may quote the specification
+freely.

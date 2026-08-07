@@ -1,8 +1,8 @@
 # Object-flow Programming Language v0 Specification Current Draft
 
 Status: current working draft  
-Date: 2026-07-28  
-Based on: baseline 2026-07-01, with design resolutions through 2026-07-28, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, and descriptive-metadata resolutions
+Date: 2026-08-07  
+Based on: baseline 2026-07-01, with design resolutions through 2026-08-07, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, and descriptive-metadata resolutions
 
 This document is a self-contained current draft specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
@@ -1048,6 +1048,8 @@ Array<T>:
 ```
 
 A static value must not rely on YAML custom tags or implementation-specific scalar types for portable v0 conformance.
+
+The finiteness requirement above constrains the type-level static value only. It does not extend to the Float values a workflow produces at run time. A non-finite runtime view value is a data-phase concern (6.2), not a violation of this section, and v0 does not require an implementation to reject one. The asymmetry is deliberate: a static value is a constant written into the document and exchanged with every consumer of it, whereas a runtime value is computed and never appears in the IR.
 
 If a view field declaration omits `value`, the field is an ordinary required runtime or instance-level view projection. Static and non-static view fields use the same contract reference syntax.
 
@@ -2839,7 +2841,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 54. In v0, user-defined view field types must be primitive Pure Data types or Arrays recursively containing only primitive Pure Data element types.
 55. User-defined nominal Data types, Object types, Arrays of user-defined nominal Data types, and Arrays of Object types are not valid user-defined view field types.
 56. A user-defined view field may declare an optional static `value`; if present, it is a graph-time type-level constant that must conform to the field's declared view field type.
-57. Static view values must not be `null`; Float static values may use YAML integer, floating-point, or exponent numeric forms, but NaN and infinity are not valid portable v0 static values.
+57. Static view values must not be `null`; Float static values may use YAML integer, floating-point, or exponent numeric forms, but NaN and infinity are not valid portable v0 static values. This constrains the type-level constant only, not the Float values a workflow produces at run time.
 58. Static view values do not create workflow values, Object identities, Object mappings, or Object tracking effects.
 59. Every `type` field value is a YAML string scalar containing a v0 type expression. `Array<T>` is the only built-in type constructor, requires exactly one type argument, and may be nested.
 60. Whitespace is allowed only immediately inside `Array` angle brackets, such as `Array< T >`; whitespace between `Array` and `<` is invalid.

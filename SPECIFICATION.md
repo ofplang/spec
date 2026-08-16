@@ -2,7 +2,7 @@
 
 Status: current working draft  
 Date: 2026-08-16  
-Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, and rigid-type-parameter resolutions
+Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, rigid-type-parameter, and generic-contract-reference resolutions
 
 This document is a self-contained current draft specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
@@ -1238,6 +1238,10 @@ ensures:  inputs.*.view and outputs.*.view
 `ensures` expressions may reference both `inputs.*.view` and `outputs.*.view`.
 
 The structure and meaning of `.view` are defined by the referenced value's type. A contract expression may reference only fields present in the resolved type's view schema, or specification-defined primitive and Array views.
+
+Where a port's declared type is a type parameter of the enclosing process, there is no resolved type at the process definition: the type argument is chosen independently at each instantiation (8.1), and a document may instantiate the same generic process differently at different invocations. Such a reference is therefore not resolved against any view schema when the definition is validated, and neither the presence of the referenced field nor the type of the reference is a validation error there. Everything about the expression that does not depend on the referenced type — its grammar, its reference scope, the ports it names, and the operands that are not themselves such references — is still validated at the definition.
+
+The domain of the type parameter is known at the definition even though the type argument is not, and what it decides is decided there. A parameter declared `domain: object` is instantiated only by a nominal Object type, and a nominal type's `.view` is a view schema rather than a scalar (7.4), so a bare `.view` on such a port is a validation error at the definition. A parameter declared `domain: data` may be instantiated by a primitive type, whose `.view` is the scalar itself, so a bare `.view` on that port is not.
 
 ### 9.2 Contract expression language
 
@@ -2937,3 +2941,4 @@ Implementations may report validation, portability, unsupported-feature, and ext
 86. The resolved type of a bound value must match the resolved type of the port it is bound to, in every binding section and in `body.returns`. Matching is the structural matching relation of generic instantiation, which reduces to identity of type expressions when no type parameter is involved. An `each` source must be an Array, and it is its element type that is matched against the target input port.
 87. A literal binding source (`value`) must conform to its port's declared type, checked exactly as a static view value is checked against a view field type; an integer literal is accepted for a `Float` port. A literal must not be bound to an Object-bearing port.
 88. Structural matching distinguishes a flexible type parameter (declared by the target process, determined by instantiation) from a rigid one (declared by the enclosing process, already fixed). A flexible parameter may be inferred to be a rigid parameter of matching domain; a rigid parameter matches only itself and never a concrete type. A `where` constraint whose parameter was inferred to a rigid parameter is satisfied only if the enclosing process declares that same constraint over it.
+89. A contract view reference through a port whose declared type is a type parameter is not resolved against a view schema at the process definition, since the type argument is chosen at each instantiation; the grammar, reference scope, named ports, and other operands of the expression are still validated there. The parameter's domain is known at the definition: a bare `.view` on an `object`-domain parameter is a validation error, and on a `data`-domain parameter it is not.

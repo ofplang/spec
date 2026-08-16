@@ -1185,6 +1185,8 @@ No subtyping, implicit conversion, trait-based widening, union matching, common-
 
 A rigid parameter does not match a concrete atomic type. Inside a generic process whose parameter is `U`, a port of type `U` may hold a value of any type the caller eventually chooses, so binding it to a port that requires one particular concrete type is not sound and is a validation error.
 
+A literal binding source (11.1.1) determines no type argument. An integer literal conforms to a `Float` port as well as an `Int` one, so it does not say which of them the parameter is; inference reads only the resolved types of values that come from elsewhere. A type parameter whose every occurrence is bound by a literal therefore cannot be inferred.
+
 If a type parameter cannot be inferred, or if matching constraints infer incompatible concrete types for the same type parameter, the invocation is a validation error.
 
 Type argument inference is performed during graph validation. It does not depend on runtime values. Source value types are resolved from process signatures, node binding rules, structured node output rules, and previously validated graph structure.

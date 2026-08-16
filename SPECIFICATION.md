@@ -1,8 +1,8 @@
 # Object-flow Programming Language v0 Specification Current Draft
 
 Status: current working draft  
-Date: 2026-08-07  
-Based on: baseline 2026-07-01, with design resolutions through 2026-08-07, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, and descriptive-metadata resolutions
+Date: 2026-08-16  
+Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, and rigid-type-parameter resolutions
 
 This document is a self-contained current draft specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
@@ -1166,24 +1166,32 @@ v0 does not define explicit type argument syntax at node invocation sites. A gen
 
 Every type parameter declared by a process must appear in at least one input port type of that process. A type parameter that appears only in output port types, only in `where`, or not at all is a validation error.
 
-Type inference uses structural matching between target process input port types and the resolved types of the bound source values:
+Type inference uses structural matching between target process input port types and the resolved types of the bound source values.
+
+Two kinds of type parameter can occur in one match, and they behave differently. A type parameter declared by the **target** process is **flexible**: instantiating the invocation is what determines it. A type parameter declared by the **enclosing** process — the one whose body contains this invocation — is **rigid**: inside that body it stands for a type that is unknown but already fixed by whoever will instantiate the enclosing process, so nothing here may choose it. A concrete atomic type is a built-in primitive type or a top-level user-defined type.
 
 ```text
 A built-in primitive type matches only the same built-in primitive type.
 A user-defined nominal type matches only the same nominal type.
 Array<X> matches Array<Y> by recursively matching X and Y.
-An unbound type parameter matches a concrete atomic type whose domain matches the declared type parameter domain.
-An already-bound type parameter matches only the same concrete atomic type.
+An unbound flexible parameter matches a concrete atomic type whose domain matches the declared flexible parameter domain.
+An unbound flexible parameter matches a rigid parameter whose domain matches the declared flexible parameter domain.
+An already-bound flexible parameter matches only what it is already bound to.
+A rigid parameter matches only that same rigid parameter.
 All other matches fail.
 ```
 
 No subtyping, implicit conversion, trait-based widening, union matching, common-supertype inference, or Array-to-type-parameter binding is performed.
+
+A rigid parameter does not match a concrete atomic type. Inside a generic process whose parameter is `U`, a port of type `U` may hold a value of any type the caller eventually chooses, so binding it to a port that requires one particular concrete type is not sound and is a validation error.
 
 If a type parameter cannot be inferred, or if matching constraints infer incompatible concrete types for the same type parameter, the invocation is a validation error.
 
 Type argument inference is performed during graph validation. It does not depend on runtime values. Source value types are resolved from process signatures, node binding rules, structured node output rules, and previously validated graph structure.
 
 After type arguments are inferred, all `where` constraints are checked during graph validation. A document-defined trait constraint `Trait<T>` is satisfied only if the inferred concrete type for `T` implements `Trait`. The built-in constraint `Numeric<T>` is satisfied only when `T` is `Int` or `Float`.
+
+When a flexible parameter is inferred to be a **rigid** parameter, there is no concrete type to look a trait up on, so the constraint is instead discharged from what the enclosing process already promises. A constraint `Trait<T>` whose `T` was inferred to be the rigid parameter `U` is satisfied only if the enclosing process declares `Trait<U>` in its own `where`. `Numeric<T>` inferred to a rigid `U` is satisfied only if the enclosing process declares `Numeric<U>`. This is what makes a generic process usable from inside another generic process: the caller states the constraints its own parameter satisfies, and those are what the callee's constraints are checked against.
 
 The `where` section, if present, must be a sequence of string scalar constraints. Each constraint must have the form:
 
@@ -1447,6 +1455,47 @@ bind:
 In `fold` and `do_while`, `carry` means a loop-carried value. The output of one iteration becomes the carry input of the next iteration. `carry` does not imply physical Object identity preservation; physical identity behavior is determined independently by Object tracking declarations.
 
 In `branch`, `args` are supplied only to the selected arm. They are not fan-out, even when Object-bearing. Branch output ports are selected-arm output ports exposed as common outputs.
+
+### 11.1 Binding type compatibility
+
+Every binding connects a value to a port. The resolved type of the bound value must **match** the resolved type of the port it is bound to. A binding whose value type does not match its port type is a validation error.
+
+Matching is the structural matching relation defined for generic instantiation (8.1). When neither type contains a type parameter, that relation reduces to identity of type expressions: `Cup` matches only `Cup`, `Array<Cup>` matches only `Array<Cup>`, and `Array<Cup>` does not match `Cup`. v0 performs no subtyping, widening, or implicit conversion at a binding, exactly as it performs none in generic instantiation.
+
+What is compared depends on the binding section:
+
+```text
+state    the bound value               against the target process input port
+bind     the bound value               against the target process input port
+carry    the bound value               against the target process input port
+each     the bound value's element type against the target process input port
+args     the bound value               against the same-named input port of each arm (20)
+returns  the bound value               against the composite output port it returns
+```
+
+An `each` source must be an Array. Its element type is what the target process input port is matched against, because the source is traversed element-wise (11, 17, 18): a `map` or `fold` over `each: {label: {from: inputs.labels}}` binds one element of `labels` to the port `label` per invocation. A source that is not an Array cannot be traversed and is a validation error.
+
+The requirement that a branch argument correspond to a same-name, same-type, same-phase input port of each arm is stated in 20; the requirement that a `fold` or `do_while` carry output be same-name, same-type, same-phase is stated in 16. This section adds the complementary rule for the value bound *into* those sections.
+
+`branch.condition.from` must resolve to a `Bool` Pure Data value (20).
+
+When the bound source is a structured node output, its resolved type is the type that structured node exposes for it (21).
+
+#### 11.1.1 Literal values
+
+A binding source entry that carries `value` rather than `from` (2.6.6) supplies a literal. The literal must conform to the port's declared type, checked exactly as a static view value is checked against its declared view field type (7.4):
+
+```text
+Bool     the YAML value must be a boolean scalar.
+Int      the YAML value must be an integer scalar.
+Float    the YAML value must be a finite numeric scalar; a YAML integer is accepted.
+String   the YAML value must be a string scalar.
+Array<T> the YAML value must be a sequence whose every element conforms to T.
+```
+
+The acceptance of an integer literal for a `Float` port is the same latitude 7.4 gives a static `Float` view value, and for the same reason: YAML integer, floating-point, and exponent forms all denote a number, and a document should not have to write `3.0` where `3` is meant. It is not a subtyping rule and does not extend to `from` bindings, where an `Int`-typed value does not match a `Float` port.
+
+A literal is Pure Data. A literal bound to an Object-bearing port is a validation error, since a literal cannot introduce an Object identity (13).
 
 ---
 
@@ -2248,6 +2297,19 @@ If `outputs` is omitted, the node uses the default output behavior defined for i
 
 If `outputs` is present, only outputs explicitly listed in `outputs` are exposed by the structured node.
 
+An exposed output is an ordinary body-visible value: another node may bind it, and `body.returns` may return it. Its resolved type — which binding type compatibility (11.1) is checked against — follows from the mode, given a target process output `p: T`:
+
+```text
+map       every output p          Array<T>
+collect   fold / do_while         Array<T>
+last      fold / do_while         T
+carry     fold / do_while         the carry binding's type, which is T (16)
+common    branch                  T, the same type in both arms (20.1)
+drop      any                     not exposed; not a body-visible value
+```
+
+`map` output types follow the shape rule of 17, so a target output that is already an Array becomes a nested Array. Because `mode: last` and `mode: drop` are restricted to Pure Data outputs (18.1, 19.1), an Object-bearing output is only ever exposed as `carry`, `collect`, or `common`.
+
 Common modes:
 
 ```text
@@ -2870,3 +2932,6 @@ Implementations may report validation, portability, unsupported-feature, and ext
 83. Extension-tolerant mode may accept `x-` extension keys and `x-` extension feature names, but unknown non-`x-` keys remain validation errors.
 84. v0 core validation does not accept implementation-defined type constructors, process kinds, node kinds, Object transform kinds, binding sections, output modes, or alternate generic inference semantics; such changes define an extended dialect.
 85. A v0 document may include optional human-readable `description` metadata at the document root and at trait, type, and process definitions. `description` must be a YAML string scalar, is not a reserved identifier name, and does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling, or runtime behavior.
+86. The resolved type of a bound value must match the resolved type of the port it is bound to, in every binding section and in `body.returns`. Matching is the structural matching relation of generic instantiation, which reduces to identity of type expressions when no type parameter is involved. An `each` source must be an Array, and it is its element type that is matched against the target input port.
+87. A literal binding source (`value`) must conform to its port's declared type, checked exactly as a static view value is checked against a view field type; an integer literal is accepted for a `Float` port. A literal must not be bound to an Object-bearing port.
+88. Structural matching distinguishes a flexible type parameter (declared by the target process, determined by instantiation) from a rigid one (declared by the enclosing process, already fixed). A flexible parameter may be inferred to be a rigid parameter of matching domain; a rigid parameter matches only itself and never a concrete type. A `where` constraint whose parameter was inferred to a rigid parameter is satisfied only if the enclosing process declares that same constraint over it.

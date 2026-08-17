@@ -2,7 +2,7 @@
 
 Status: current working draft  
 Date: 2026-08-16  
-Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, rigid-type-parameter, and generic-contract-reference resolutions
+Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, rigid-type-parameter, generic-contract-reference, and view-field-name resolutions
 
 This document is a self-contained current draft specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
@@ -134,7 +134,7 @@ Input port names and output port names are separate namespaces. Therefore, an in
 
 The key `$import` is the only `$`-prefixed reserved key defined by v0. Any other `$`-prefixed key is a validation error in portable v0.
 
-The following names are reserved and must not be used as process names, port names, node ids, binding names, return names, view field names, type names, trait names, or type parameter names:
+The following names are reserved and must not be used as process names, port names, node ids, binding names, return names, type names, trait names, or type parameter names:
 
 ```text
 inputs
@@ -174,6 +174,8 @@ contracts
 requires
 ensures
 ```
+
+View field names are deliberately absent from that list: they must match the identifier grammar and must not contain `.`, but a reserved name is allowed. A view field name occurs in only two places, and in neither can it be confused with a structural key. In a view schema the field name is the outer key and the declaration keys `type` and `value` are inside it, so `value: {type: Int}` declares a field named `value`. In a contract reference the field is the single segment after `.view`, so `inputs.x.view.value` reads that field. Reserving names here would cost expressiveness without removing an ambiguity.
 
 A validator may report a more specific error when a name fails the grammar for its syntactic position or conflicts with a reserved name.
 
@@ -2947,3 +2949,4 @@ Implementations may report validation, portability, unsupported-feature, and ext
 88. Structural matching distinguishes a flexible type parameter (declared by the target process, determined by instantiation) from a rigid one (declared by the enclosing process, already fixed). A flexible parameter may be inferred to be a rigid parameter of matching domain; a rigid parameter matches only itself and never a concrete type. A `where` constraint whose parameter was inferred to a rigid parameter is satisfied only if the enclosing process declares that same constraint over it.
 89. A contract view reference through a port whose declared type is a type parameter is not resolved against a view schema at the process definition, since the type argument is chosen at each instantiation; the grammar, reference scope, named ports, and other operands of the expression are still validated there. The parameter's domain is known at the definition: a bare `.view` on an `object`-domain parameter is a validation error, and on a `data`-domain parameter it is not.
 90. Such a reference is instead resolved at each invocation that instantiates the process, by substituting that invocation's inferred type arguments into the target's port types and checking the expression against the resolved types. An invocation resolves only the type arguments it infers itself: where a type argument is a type parameter of the enclosing process, or where inference determined none, the contract is not checked at that invocation. A `where` constraint does not make a view field decidable, because a trait declares no field.
+91. View field names must match the v0 identifier grammar and must not contain `.`, but they are not subject to the reserved-name list: a view field name is only ever an outer key in a view schema or the single segment after `.view` in a contract reference, so it cannot be confused with a structural key.

@@ -2,7 +2,7 @@
 
 Status: current working draft  
 Date: 2026-08-16  
-Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, rigid-type-parameter, generic-contract-reference, and view-field-name resolutions
+Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, rigid-type-parameter, generic-contract-reference, view-field-name, and phase-determined-validation resolutions
 
 This document is a self-contained current draft specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
@@ -627,6 +627,14 @@ array_uncons on an Array known to be empty at graph phase
 mode: last on a fold traversal known to be empty at graph phase
 zip-equal traversal length mismatch known at graph phase
 ```
+
+The last three entries are conditional on what the implementation determines, not
+unconditional obligations. Each names a condition that v0 classifies by the earliest phase
+at which it is determined, and v0 requires no static inference of Array or traversal
+lengths, so an implementation that never establishes emptiness or a length mismatch at
+graph phase reports these conditions at run or data phase instead, as the entries below
+say. Their absence from such an implementation's validation errors is correct behavior
+rather than a missing check.
 
 Examples of run-start or runtime data errors:
 
@@ -2950,3 +2958,4 @@ Implementations may report validation, portability, unsupported-feature, and ext
 89. A contract view reference through a port whose declared type is a type parameter is not resolved against a view schema at the process definition, since the type argument is chosen at each instantiation; the grammar, reference scope, named ports, and other operands of the expression are still validated there. The parameter's domain is known at the definition: a bare `.view` on an `object`-domain parameter is a validation error, and on a `data`-domain parameter it is not.
 90. Such a reference is instead resolved at each invocation that instantiates the process, by substituting that invocation's inferred type arguments into the target's port types and checking the expression against the resolved types. An invocation resolves only the type arguments it infers itself: where a type argument is a type parameter of the enclosing process, or where inference determined none, the contract is not checked at that invocation. A `where` constraint does not make a view field decidable, because a trait declares no field.
 91. View field names must match the v0 identifier grammar and must not contain `.`, but they are not subject to the reserved-name list: a view field name is only ever an outer key in a view schema or the single segment after `.view` in a contract reference, so it cannot be confused with a structural key.
+92. Where a validation error names a condition classified by the phase at which it is determined, the obligation is conditional on the implementation determining it at that phase. v0 requires no static inference of Array or traversal lengths, so an implementation that establishes emptiness or a length mismatch only at run or data phase reports it there, and not reporting it as a validation error is correct.

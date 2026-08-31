@@ -11,6 +11,15 @@ specification itself.
 
 ### Removed
 
+- **18.1**, **19.1** output mode `last`, and **18.2** the section that related an
+  empty `fold` traversal to it. Every output mode now applies uniformly to the
+  whole traversal, and no mode requires an invocation to have happened, so an
+  empty traversal is no longer a phase-dependent error. `carry` replaces every
+  use of `last`; what it adds is that the initial value must be written.
+- **4.4**, **6.2**, **25** the `mode: last` on an empty traversal error examples
+  and its entry among the phase-dependent conditions. A zip-equal length
+  mismatch is now the only one.
+
 - **14.4** transform kinds `array_uncons`, `array_cons`, and `array_reverse`,
   with the sections that defined them. A document using one of them is no longer
   valid.
@@ -46,6 +55,17 @@ specification itself.
   while the carry output is created -- was accounted for and yet had no
   expressible Object correspondence for the node, since it would have to name a
   position within a collection.
+- **19.3** a `do_while` node exposes a reserved Boolean output `exhausted`, true
+  when it terminated by reaching `max_iterations` with the condition still true.
+  Whether the limit was reached is a fact about the node rather than about the
+  target process, which cannot know whether an invocation was its last, so no
+  carry value could report it.
+- **2.4** `exhausted` is a reserved name. It is the one entry in that list that
+  is not a structural key: were a target process free to declare an output of
+  that name, `<node>.exhausted` would name two different values.
+- **11** what a `value` literal may be -- a primitive or a Pure Data `Array`,
+  including an empty one -- and that a Pure Data carry may take its initial
+  value from one while an Object-bearing carry may not.
 - **1**, design goal 10: the shape of the Object-flow graph is statically
   determined, and run-time information may only index that shape as a finite
   scalar parameter.
@@ -65,6 +85,13 @@ specification itself.
 
 ### Migrating from 0.0
 
+- An output written with `mode: last` becomes a `carry`: the target process
+  threads the value itself and the node exposes the final one. The initial value
+  must now be written, which is the one thing `mode: last` did not require.
+- A workflow that told bounded termination apart by reading a `mode: last`
+  condition output reads `<node>.exhausted` instead.
+- A port, process, node id, binding, return, type, trait, or type parameter
+  named `exhausted` must be renamed.
 - A use of `array_reverse` has no replacement. Order is observable in v0 only
   through the correspondence between collections, the traversal order of `fold`,
   and the output order of `collect`, so a workflow that depended on reversal must

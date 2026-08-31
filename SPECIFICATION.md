@@ -201,7 +201,10 @@ script
 contracts
 requires
 ensures
+exhausted
 ```
+
+Every name in that list but the last is a structural key of the document. `exhausted` is there for the other reason a name is reserved: a `do_while` node exposes a reserved output of that name (19.3), so were a target process free to declare an output called `exhausted`, a reference to `<node>.exhausted` would name two different values and there would be no way to say which.
 
 View field names are deliberately absent from that list: they must match the identifier grammar and must not contain `.`, but a reserved name is allowed. A view field name occurs in only two places, and in neither can it be confused with a structural key. In a view schema the field name is the outer key and the declaration keys `type` and `value` are inside it, so `value: {type: Int}` declares a field named `value`. In a contract reference the field is the single segment after `.view`, so `inputs.x.view.value` reads that field. Reserving names here would cost expressiveness without removing an ambiguity.
 
@@ -377,7 +380,7 @@ A source entry containing both `from` and `value`, or neither, is a validation e
 
 `do_while.condition.output` is an output name of the target process, not a body dataflow reference. The named target process output must exist and must be a Boolean Data output. It is evaluated after each invocation of the target process. The `do_while` node repeats while this output value is `true` and exits when it is `false`, subject to `max_iterations`.
 
-The condition output is an ordinary non-carry Data output for output-mode purposes. It may be exposed using `collect`, `last`, or `drop` when explicit `do_while.outputs` are present. If `do_while.outputs` is omitted, the condition output is dropped by default.
+The condition output is an ordinary non-carry Data output for output-mode purposes. It may be exposed using `collect` or `drop` when explicit `do_while.outputs` are present. If `do_while.outputs` is omitted, the condition output is dropped by default.
 
 Reference parsing and reference resolution are separate validation steps. A malformed reference is a validation error. A syntactically valid reference whose target does not exist is an unknown reference validation error. A reference that is not valid in its syntactic context is an invalid reference scope validation error. A reference whose resolved type or phase does not satisfy the target requirement is a type or phase validation error.
 
@@ -651,22 +654,25 @@ invalid transform role set
 transform role type mismatch
 Pure Data path appears in objects.transform
 transform path participates in multiple incompatible Object fates or provenances
-mode: last on a fold traversal known to be empty at graph phase
+map or fold node has no each source
+Object-bearing carry is neither preserved nor replaced by the target process
+node binding names no input port of the target process
+target process input port is not bound, or is bound more than once
+do_while node outputs section lists the reserved output exhausted
 zip-equal traversal length mismatch known at graph phase
 ```
 
-The last two entries are conditional on what the implementation determines, not
-unconditional obligations. Each names a condition that v0 classifies by the earliest phase
+The last entry is conditional on what the implementation determines rather than an
+unconditional obligation. It names a condition that v0 classifies by the earliest phase
 at which it is determined, and v0 requires no static inference of Array or traversal
-lengths, so an implementation that never establishes emptiness or a length mismatch at
-graph phase reports these conditions at run or data phase instead, as the entries below
-say. Their absence from such an implementation's validation errors is correct behavior
-rather than a missing check.
+lengths, so an implementation that never establishes a length mismatch at graph phase
+reports the condition at run or data phase instead, as the entry below says. Its absence
+from such an implementation's validation errors is correct behavior rather than a missing
+check.
 
 Examples of run-start or runtime data errors:
 
 ```text
-mode: last on a fold traversal that is empty, when emptiness is first determined at run or data phase
 zip-equal traversal length mismatch, when the mismatch is first determined at run or data phase
 ```
 
@@ -814,7 +820,7 @@ If a violation is not known at `graph` phase but is determined at `run` phase, i
 
 If a violation is determined only at `data` phase, it is a runtime data error. Runtime data errors are outside the core validation semantics of v0, but this specification may define standard execution behavior for such cases where useful.
 
-This principle applies to phase-dependent conditions such as empty traversal with `mode: last`, zip-equal length mismatch, and similar checks whose truth may depend on graph, run, or data phase values.
+This principle applies to phase-dependent conditions such as a zip-equal length mismatch, and similar checks whose truth may depend on graph, run, or data phase values.
 
 ---
 
@@ -1504,6 +1510,41 @@ bind:
     value: 3
 ```
 
+A `value` is a Pure Data literal. What may be written is a v0 primitive type -- `Bool`, `Int`, `Float`, or `String` -- or a Pure Data `Array`, written as a YAML sequence whose elements satisfy the same restriction recursively.
+
+```yaml
+bind:
+  intensity:
+    value: 3
+  labels:
+    value: ["a", "b", "c"]
+  empty:
+    value: []
+```
+
+Conformance of a literal to its declared type follows the same rule as a static view value (7.4). `null`, YAML custom tags, `NaN`, and infinities are not portable v0 values. A value of an Object-bearing type cannot be written as a literal: v0 has no literal notation for an Object, and a literal introduces no Object identity (13).
+
+An empty `Array` literal is how an Object-bearing empty collection is obtained. An `each` source of length zero makes a `map` perform zero invocations and collect empty outputs (17), so a `map` over an empty literal produces an empty Array of the target's output type, Object-bearing or not.
+
+```yaml
+- id: none
+  kind: map
+  process: int_to_cup
+  each:
+    n:
+      value: []
+```
+
+A Pure Data carry binding may take its initial value from a literal in the same way. An Object-bearing carry binding must use `from`, since no literal can denote an Object.
+
+```yaml
+carry:
+  reached:
+    value: false
+  score:
+    from: inputs.initial_score
+```
+
 In `fold` and `do_while`, `carry` means a loop-carried value. The output of one iteration becomes the carry input of the next iteration. `carry` does not imply physical Object identity preservation; physical identity behavior is determined independently by Object tracking declarations.
 
 In `branch`, `args` are supplied only to the selected arm. They are not fan-out, even when Object-bearing. Branch output ports are selected-arm output ports exposed as common outputs.
@@ -2138,7 +2179,6 @@ For a `fold` node, valid output modes are:
 ```text
 carry
 collect
-last
 drop
 ```
 
@@ -2148,30 +2188,15 @@ Rules:
 2. When `outputs` is present, every carry binding must be listed with `mode: carry`.
 3. `mode: collect` may be used for non-carry outputs of the target process. The collected output may be Pure Data or Object-bearing.
 4. For target process output `p: T`, a fold output `p` with `mode: collect` has type `Array<T>` and contains per-invocation output values in invocation order.
-5. `mode: last` may be used only for non-carry Pure Data outputs of the target process.
-6. `mode: drop` may be used only for non-carry Pure Data outputs.
-7. Object-bearing outputs must not use `mode: last` or `mode: drop`.
-8. Every Object-bearing output of the target process must be exposed either as `mode: carry` or as `mode: collect`.
-9. In v0, all collected per-invocation outputs of the same `fold` have the same Array length.
-10. If `outputs` is present, it is fully explicit: every target process output must be listed with `mode: carry`, `collect`, `last`, or `drop`, subject to the Object-bearing restrictions above.
+5. `mode: drop` may be used only for non-carry Pure Data outputs.
+6. Object-bearing outputs must not use `mode: drop`.
+7. Every Object-bearing output of the target process must be exposed either as `mode: carry` or as `mode: collect`.
+8. In v0, all collected per-invocation outputs of the same `fold` have the same Array length.
+9. If `outputs` is present, it is fully explicit: every target process output must be listed with `mode: carry`, `collect`, or `drop`, subject to the Object-bearing restrictions above.
 
-### 18.2 Empty fold traversal
+### 18.2 Default fold outputs
 
-Empty `each` traversal is not an error by itself.
-
-For `fold`, if all `each` inputs have length zero, the invocation performs zero element-wise calls. Outputs with `mode: collect` produce empty Arrays, including Object-bearing collect outputs whose result contains zero Object slots. Carry outputs with `mode: carry` expose the initial carry value unchanged.
-
-However, an output with `mode: last` requires at least one element-wise invocation.
-
-If it is known at `graph` phase that the traversal is empty, a `fold` node exposing any `mode: last` output is a graph-time validation error.
-
-If emptiness is not known at `graph` phase but is known at `run` phase, the same condition is a run-start validation error or preflight error for that run.
-
-If emptiness is known only at `data` phase, the condition is a runtime data error. Runtime data errors are outside the core validation semantics of v0, but the standard v0 execution behavior is that the invocation cannot produce a value for the affected `mode: last` output.
-
-Therefore, `mode: last` on an empty fold traversal is invalid at the earliest phase where emptiness is determined.
-
-### 18.3 Default fold outputs
+An empty `each` traversal is not an error. The node performs zero element-wise invocations, `mode: collect` outputs are empty Arrays -- including an Object-bearing collect output, which then contains zero Object slots -- and `mode: carry` outputs expose the initial carry value unchanged. No fold output mode requires an invocation to have happened.
 
 If `outputs` is omitted:
 
@@ -2181,7 +2206,7 @@ non-carry Pure Data outputs are dropped
 if the target process has any non-carry Object-bearing output, the fold node must declare an explicit `outputs` section
 ```
 
-Thus, `fold` does not collect outputs by default. Use explicit `mode: collect` or `mode: last` when non-carry outputs are needed. If the target process has any non-carry Object-bearing output, the fold node must have an explicit `outputs` section listing each such output with `mode: collect`. If `outputs` is present, the default behavior is disabled and the `outputs` section is fully explicit.
+Thus, `fold` does not collect outputs by default. Use explicit `mode: collect` when non-carry outputs are needed. If the target process has any non-carry Object-bearing output, the fold node must have an explicit `outputs` section listing each such output with `mode: collect`. If `outputs` is present, the default behavior is disabled and the `outputs` section is fully explicit.
 
 ---
 
@@ -2233,7 +2258,7 @@ Requirements:
 
 If `max_iterations` is reached while the condition remains true, the `do_while` node terminates by reaching its iteration limit. This is **bounded termination**. Bounded termination is not an IR validation error, and v0 does not define it as a runtime failure.
 
-Under bounded termination, the standard v0 execution behavior is that the `do_while` node still produces outputs from the invocations that actually ran. Carry outputs expose the final executed invocation's carry outputs. Collected outputs contain all executed invocation outputs in invocation order. Last outputs expose the final executed invocation output. If the condition output is explicitly exposed, the final collected or last condition value is `true`.
+Under bounded termination, the standard v0 execution behavior is that the `do_while` node still produces outputs from the invocations that actually ran. Carry outputs expose the final executed invocation's carry outputs. Collected outputs contain all executed invocation outputs in invocation order. If the condition output is collected, the final collected condition value is `true`. The node's reserved `exhausted` output (19.3) is `true`.
 
 An implementation may report bounded termination as a diagnostic, warning, runtime status, policy concern, or runtime concern.
 
@@ -2244,7 +2269,6 @@ For a `do_while` node, valid output modes are:
 ```text
 carry
 collect
-last
 drop
 ```
 
@@ -2253,21 +2277,19 @@ Rules:
 1. `mode: carry` may be used only for outputs corresponding to do-while carry bindings. The carry value may be Pure Data or Object-bearing.
 2. When `outputs` is present, every carry binding must be listed with `mode: carry`.
 3. `mode: collect` may be used only for non-carry Data outputs of the target process.
-4. `mode: last` may be used only for non-carry Data outputs of the target process.
-5. `mode: drop` may be used only for non-carry Data outputs.
-6. The condition output is an ordinary Boolean Data output of the target process and may be exposed using `collect`, `last`, or `drop`.
-7. Non-carry Object-bearing outputs remain forbidden in `do_while`.
-8. Collected Data outputs are ordered by invocation order.
-9. The condition output includes the final `false` value when the loop exits normally because the condition became false, if the condition output is collected.
-10. If `max_iterations` is reached while the condition remains true, the node terminates by reaching its iteration limit. This is bounded termination.
-11. Under bounded termination, exposed outputs are produced from the invocations that actually ran.
-12. Under bounded termination, `mode: carry` exposes the final executed invocation's carry output.
-13. Under bounded termination, `mode: collect` contains all executed invocation outputs in invocation order.
-14. Under bounded termination, `mode: last` exposes the final executed invocation output.
-15. If the condition output is collected under bounded termination, the collected values include the final `true` value.
-16. If the condition output is exposed with `mode: last` under bounded termination, that value is `true`.
-17. In v0, all collected per-invocation Data outputs of the same `do_while` have the same Array length.
-18. If the target process has any non-carry Object-bearing output, the `do_while` node is invalid. Otherwise, when `outputs` is present, it is fully explicit: every target process output must be listed with `mode: carry`, `collect`, `last`, or `drop`.
+4. `mode: drop` may be used only for non-carry Data outputs.
+5. The condition output is an ordinary Boolean Data output of the target process and may be exposed using `collect` or `drop`.
+6. Non-carry Object-bearing outputs remain forbidden in `do_while`.
+7. Collected Data outputs are ordered by invocation order.
+8. The condition output includes the final `false` value when the loop exits normally because the condition became false, if the condition output is collected.
+9. If `max_iterations` is reached while the condition remains true, the node terminates by reaching its iteration limit. This is bounded termination.
+10. Under bounded termination, exposed outputs are produced from the invocations that actually ran.
+11. Under bounded termination, `mode: carry` exposes the final executed invocation's carry output.
+12. Under bounded termination, `mode: collect` contains all executed invocation outputs in invocation order.
+13. If the condition output is collected under bounded termination, the collected values include the final `true` value.
+14. In v0, all collected per-invocation Data outputs of the same `do_while` have the same Array length.
+15. If the target process has any non-carry Object-bearing output, the `do_while` node is invalid. Otherwise, when `outputs` is present, it is fully explicit: every target process output must be listed with `mode: carry`, `collect`, or `drop`.
+16. The reserved output `exhausted` (19.3) must not be listed in `outputs`.
 
 ### 19.2 Default do-while outputs
 
@@ -2279,7 +2301,45 @@ non-carry Data outputs are dropped, including the condition output
 non-carry Object-bearing outputs are forbidden
 ```
 
-Thus, `do_while` does not collect Data outputs by default. Use explicit `mode: collect` or `mode: last` when those outputs are needed. If `outputs` is present, the default behavior is disabled and the `outputs` section is fully explicit.
+Thus, `do_while` does not collect Data outputs by default. Use explicit `mode: collect` when those outputs are needed. The reserved `exhausted` output (19.3) is exposed either way; it is not part of this default and is never listed. If `outputs` is present, the default behavior is disabled and the `outputs` section is fully explicit.
+
+### 19.3 Iteration limit output
+
+A `do_while` node has a reserved Boolean output named `exhausted`, in addition to the outputs it exposes from its target process.
+
+```text
+exhausted = true   the node terminated by bounded termination: `max_iterations`
+                   was reached while the condition output was still true
+exhausted = false  the node terminated because the condition output became false
+```
+
+`exhausted` is a Pure Data output with `phase: data`. It is always defined, so it is not listed in the `outputs` section; listing it there is a validation error, whether or not `outputs` is present for other reasons.
+
+```yaml
+- id: passage
+  kind: do_while
+  process: passage_once
+  carry:
+    sample:
+      from: inputs.sample
+  condition:
+    output: continue
+  max_iterations:
+    value: 10
+  outputs:
+    sample:
+      mode: carry
+    continue:
+      mode: drop
+
+# passage.exhausted is available as a Bool
+```
+
+`exhausted` is the only way a workflow can tell the two terminations apart. Whether the iteration limit was reached is a fact about the node -- `max_iterations` is written on the node -- and not about the target process, which cannot know whether an invocation was its last. A carry value cannot report it for that reason.
+
+`exhausted` reports reaching the limit, not the number of iterations. Where the iteration count or the history of the condition output is needed, the target process updates a Pure Data carry value, or the condition output is exposed with `mode: collect`.
+
+No target process declares an output named `exhausted`: the name is reserved (2.4), so a reference to `<node>.exhausted` always names this output.
 
 ---
 
@@ -2408,20 +2468,20 @@ An exposed output is an ordinary body-visible value: another node may bind it, a
 ```text
 map       every output p          Array<T>
 collect   fold / do_while         Array<T>
-last      fold / do_while         T
 carry     fold / do_while         the carry binding's type, which is T (16)
 common    branch                  T, the same type in both arms (20.1)
 drop      any                     not exposed; not a body-visible value
 ```
 
-`map` output types follow the shape rule of 17, so a target output that is already an Array becomes a nested Array. Because `mode: last` and `mode: drop` are restricted to Pure Data outputs (18.1, 19.1), an Object-bearing output is only ever exposed as `carry`, `collect`, or `common`.
+`map` output types follow the shape rule of 17, so a target output that is already an Array becomes a nested Array. Because `mode: drop` is restricted to Pure Data outputs (18.1, 19.1), an Object-bearing output is only ever exposed as `carry`, `collect`, or `common`.
+
+A `do_while` node also exposes the reserved Boolean output `exhausted` (19.3), which is not shaped by a mode and is never listed in `outputs`.
 
 Common modes:
 
 ```text
 carry   exposes the final loop-carried value for `fold` or `do_while`
 collect  collects per-invocation outputs into an Array; Object-bearing collect is allowed only where explicitly defined
-last     exposes only the final Data output value
 common   exposes a branch output common to both arms
 drop     explicitly suppresses a Data output
 ```
@@ -2437,17 +2497,17 @@ map:
 fold:
   carry output: final carry value, same name as carry binding
   Pure Data or Object-bearing output with mode collect: Array of per-iteration values
-  Data output with mode last: final per-iteration value
   Data output with mode drop: not exposed
   default: expose carry outputs only; drop non-carry Pure Data outputs; require explicit outputs for non-carry Object-bearing outputs
-  Object-bearing outputs: carry or explicit collect only; never last or drop
+  Object-bearing outputs: carry or explicit collect only; never drop
+  empty traversal: allowed; collect outputs are empty Arrays and carry outputs are the initial values
 
 do_while:
   carry output: final carry value, same name as carry binding
   Data output with mode collect: Array of per-iteration values
-  Data output with mode last: final per-iteration value
   Data output with mode drop: not exposed
-  condition output: ordinary Boolean Data output; may use collect, last, or drop
+  condition output: ordinary Boolean Data output; may use collect or drop
+  exhausted: reserved Bool output; always exposed; never listed in outputs
   default: expose carry outputs only; drop non-carry Data outputs including condition
   Object-bearing outputs: carry outputs only
 
@@ -2900,7 +2960,7 @@ types:
 
 No `Result<T, E>`, `Optional<T>`, exception edge, or try/catch construct is included in v0.
 
-Runtime data errors and runtime verification errors may occur when invocation-time data violates requirements that could not be determined statically, such as `mode: last` on an empty fold traversal or a zip-equal traversal length mismatch when the relevant lengths are only known at data phase.
+Runtime data errors and runtime verification errors may occur when invocation-time data violates requirements that could not be determined statically, such as a zip-equal traversal length mismatch when the relevant lengths are only known at data phase.
 
 For phase-dependent requirements, v0 classifies the error by the earliest phase at which the violation is determined: graph-time validation error, run-start validation or preflight error, or runtime data error. Runtime data errors are outside the core validation semantics of v0, but this specification may still define standard execution behavior for particular runtime data errors.
 
@@ -2976,7 +3036,8 @@ Implementations may report validation, portability, unsupported-feature, and ext
 31. Structured node features are `node_map`, `node_fold`, `node_do_while`, and `node_branch`.
 32. `map` requires only Object tracking completeness and exposes all target process outputs as Array outputs; v0 does not define `map.outputs`.
 33. `fold` and `do_while` require structured carry compatibility for carry outputs; `fold` also allows non-carry Object-bearing outputs only with explicit `mode: collect`.
-34. Empty `fold` traversal is allowed unless `mode: last` is required; errors are classified by the earliest phase at which emptiness is determined.
+34. Empty `fold` traversal is allowed: no fold output mode requires an invocation to have happened.
+34a. A `do_while` node exposes a reserved Boolean output `exhausted`, true when it terminated by bounded termination. It is never listed in `outputs`, and `exhausted` is a reserved name.
 35. Zip-equal length mismatches are classified by the earliest phase at which the mismatch is determined.
 36. `fold` and `do_while` expose carry outputs by default and drop non-carry Pure Data outputs by default; in `fold`, non-carry Object-bearing outputs must be explicitly listed with `mode: collect`.
 37. If `do_while` reaches `max_iterations` while its condition output remains `true`, the node terminates by bounded termination; this is not an IR validation error or a v0-defined runtime failure, and outputs are produced from the invocations that actually ran.

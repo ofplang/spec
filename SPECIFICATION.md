@@ -651,12 +651,11 @@ invalid transform role set
 transform role type mismatch
 Pure Data path appears in objects.transform
 transform path participates in multiple incompatible Object fates or provenances
-array_uncons on an Array known to be empty at graph phase
 mode: last on a fold traversal known to be empty at graph phase
 zip-equal traversal length mismatch known at graph phase
 ```
 
-The last three entries are conditional on what the implementation determines, not
+The last two entries are conditional on what the implementation determines, not
 unconditional obligations. Each names a condition that v0 classifies by the earliest phase
 at which it is determined, and v0 requires no static inference of Array or traversal
 lengths, so an implementation that never establishes emptiness or a length mismatch at
@@ -668,7 +667,6 @@ Examples of run-start or runtime data errors:
 
 ```text
 mode: last on a fold traversal that is empty, when emptiness is first determined at run or data phase
-array_uncons on an empty Array, when emptiness is first determined at run or data phase
 zip-equal traversal length mismatch, when the mismatch is first determined at run or data phase
 ```
 
@@ -816,7 +814,7 @@ If a violation is not known at `graph` phase but is determined at `run` phase, i
 
 If a violation is determined only at `data` phase, it is a runtime data error. Runtime data errors are outside the core validation semantics of v0, but this specification may define standard execution behavior for such cases where useful.
 
-This principle applies to phase-dependent conditions such as empty traversal with `mode: last`, `array_uncons` on an empty Array, zip-equal length mismatch, and similar checks whose truth may depend on graph, run, or data phase values.
+This principle applies to phase-dependent conditions such as empty traversal with `mode: last`, zip-equal length mismatch, and similar checks whose truth may depend on graph, run, or data phase values.
 
 ---
 
@@ -1784,14 +1782,29 @@ objects:
 Valid transform kinds in v0 are:
 
 ```text
-array_uncons
-array_cons
-array_reverse
+array_flatten
+array_unflatten
 ```
 
 All transform paths use explicit namespaces such as `inputs.*` and `outputs.*`.
 
 Transforms preserve physical Object identities while changing container structure. A transform must account for all Object slots in its input and output paths exactly once. No Object slot may be duplicated, lost, implicitly created, or implicitly discarded by a transform.
+
+#### 14.4.0 Acceptance criteria for set transforms
+
+**Non-normative.** This section constrains future revisions of this specification rather than documents. It states what a proposed transform kind is judged against; nothing in it is checked by an implementation.
+
+The set transforms v0 admits are **regroupings** only. **Reindexing** is not admitted.
+
+A new transform kind is considered only where it meets all three of the following criteria.
+
+**Criterion 1: value independence.** The correspondence of indices must follow from the shape of the collections alone -- their lengths and their nesting structure. It must not depend on element values, on the result of a comparison, or on the evaluation of a predicate.
+
+**Criterion 2: detectability of a mis-connection.** Where the output of the transform is passed to the `each` of one `map` or `fold` alongside a different collection that the input corresponds to, the mistake must be detectable by the `zip: equal` length check. The transform must therefore change the collection length, or must carry another means of detection where it does not.
+
+**Criterion 3: no privileged position.** The operation must not single out a particular index position, such as the first or the k-th. Order exists for the correspondence between collections and for traversal order, not for the selection of an element.
+
+What each criterion rejects: a value-dependent rearrangement such as sorting or partitioning by a predicate (criterion 1); reversal of order (criterion 2); separating the first element, or splitting at a given position (criterion 3).
 
 #### 14.4.1 Transform validation
 
@@ -1804,39 +1817,31 @@ Each transform kind defines an exact set of required input and output roles. Mis
 For v0 transform kinds, role typing is:
 
 ```text
-array_uncons:
-  inputs.xs:    Array<T>
-  outputs.head: T
-  outputs.tail: Array<T>
+array_flatten:
+  inputs.xss:  Array<Array<T>>
+  outputs.xs:  Array<T>
 
-array_cons:
-  inputs.head:  T
-  inputs.tail:  Array<T>
-  outputs.xs:   Array<T>
-
-array_reverse:
-  inputs.xs:    Array<T>
-  outputs.ys:   Array<T>
+array_unflatten:
+  inputs.xs:   Array<T>
+  outputs.xss: Array<Array<T>>
 ```
 
 In each case, the same `T` must be used consistently within that transform entry, and the referenced paths must be Object-bearing after type resolution.
 
-Transform completeness is checked using slot-level correspondence rules defined by each transform kind. These rules use index variables and slice-like notation, such as `i`, `*`, `0`, and `1..`, to describe all runtime elements without enumerating them statically. For example, `inputs.xs[i] -> outputs.ys[n - 1 - i]` means that every contained Object slot at runtime index `i` in `inputs.xs` corresponds to the contained Object slot at runtime index `n - 1 - i` in `outputs.ys`.
+Each transform kind fixes the correspondence between its input Object slots and its output Object slots as an **order-preserving total bijection**: the Object slots contained in the input, listed in traversal order, and those contained in the output, listed in traversal order, correspond one to one in that order.
 
-These correspondence rules allow validation to check that each input Object slot is accounted for exactly once and that each output Object slot has exactly one provenance, even when Array lengths are not statically known.
+Traversal order is from first to last within a collection, and outer-first dictionary order through nested collections.
 
-Nested Arrays are handled by applying the transform kind's standard meaning recursively to contained Object slots. For example, `array_uncons` on `Array<Array<Cup>>` maps the Object slots in `xs[0][*]` to `head[*]` and the Object slots in `xs[1..][*]` to `tail[*][*]`.
-
-Runtime Array lengths are not generally statically known in v0. When a transform has a length precondition, such as `array_uncons` requiring a non-empty input Array, violations are classified by the earliest phase at which they are determined. If the violation is known at graph phase, it is a validation error. If it is first known at run phase, it is a run-start validation or preflight error. If it is first known at data phase, it is a runtime data error.
+Defining the correspondence this way allows validation to check that each input Object slot is accounted for exactly once and that each output Object slot has exactly one provenance, even when Array lengths are not statically known. A transform does not prescribe which position of the output a given input slot arrives at. Since v0 does not address collection elements through an Object path (2.6.2), that information is not needed.
 
 Multiple transform entries may appear in one `objects.transform` list, but each entry declares a direct Object slot relation from `inputs.*` paths to `outputs.*` paths for the atomic process. v0 does not define transform chaining, intermediate transform values, or references from one transform entry to another.
 
 An Object slot must not be accounted for by more than one Object behavior declaration. If a slot appears in `map`, `consume`, `create`, or `transform` in a way that gives it multiple fates or multiple provenances, it is a validation error.
 
-#### 14.4.2 `array_uncons`
+#### 14.4.2 `array_flatten`
 
 ```text
-Array<T> -> T + Array<T>
+Array<Array<T>> -> Array<T>
 ```
 
 Canonical syntax:
@@ -1844,60 +1849,54 @@ Canonical syntax:
 ```yaml
 objects:
   transform:
-    - kind: array_uncons
+    - kind: array_flatten
       inputs:
-        xs: inputs.xs
-      outputs:
-        head: outputs.head
-        tail: outputs.tail
-```
-
-Meaning for `T = Cup`:
-
-```text
-inputs.xs[0]   -> outputs.head
-inputs.xs[1..] -> outputs.tail[*]
-```
-
-Meaning for `T = Array<Cup>`:
-
-```text
-inputs.xs[0][*]   -> outputs.head[*]
-inputs.xs[1..][*] -> outputs.tail[*][*]
-```
-
-`array_uncons` requires the input Array to be non-empty. Empty input handling follows the phase-dependent error classification rule.
-
-#### 14.4.3 `array_cons`
-
-```text
-T + Array<T> -> Array<T>
-```
-
-Canonical syntax:
-
-```yaml
-objects:
-  transform:
-    - kind: array_cons
-      inputs:
-        head: inputs.head
-        tail: inputs.tail
+        xss: inputs.xss
       outputs:
         xs: outputs.xs
 ```
 
-Meaning for `T = Cup`:
+Role typing:
 
 ```text
-inputs.head    -> outputs.xs[0]
-inputs.tail[*] -> outputs.xs[1..]
+inputs.xss:  Array<Array<T>>
+outputs.xs:  Array<T>
 ```
 
-#### 14.4.4 `array_reverse`
+The correspondence is an order-preserving total bijection. The inner collections of the input need not be of equal length. This kind has no precondition.
+
+A process that requires the inner collections to be of equal length states that condition in `contracts`:
+
+```yaml
+flatten_samples:
+  kind: atomic
+  inputs:
+    xss:
+      type: Array<Array<Sample>>
+      phase: data
+    inner_len:
+      type: Int
+      phase: run
+  outputs:
+    xs:
+      type: Array<Sample>
+      phase: data
+  objects:
+    transform:
+      - kind: array_flatten
+        inputs:
+          xss: inputs.xss
+        outputs:
+          xs: outputs.xs
+  contracts:
+    ensures:
+      - expr: "inputs.xss.view.length * inputs.inner_len.view == outputs.xs.view.length"
+```
+
+#### 14.4.3 `array_unflatten`
 
 ```text
-Array<T> -> Array<T>
+Array<T> -> Array<Array<T>>
 ```
 
 Canonical syntax:
@@ -1905,20 +1904,57 @@ Canonical syntax:
 ```yaml
 objects:
   transform:
-    - kind: array_reverse
+    - kind: array_unflatten
       inputs:
         xs: inputs.xs
       outputs:
-        ys: outputs.ys
+        xss: outputs.xss
 ```
 
-Meaning:
+Role typing:
 
 ```text
-inputs.xs[i] -> outputs.ys[n - 1 - i]
+inputs.xs:   Array<T>
+outputs.xss: Array<Array<T>>
 ```
 
-`array_reverse` preserves contained physical Object identities but changes Array order. Therefore it is not `elidable_iso`.
+The correspondence is an order-preserving total bijection. This kind has no precondition.
+
+How the input is divided is not prescribed by this kind. Where the number of groups or the size of each group must be specified by the process's user, it is supplied through an ordinary Pure Data input port and the required relation is stated in `contracts`. It does not appear in `objects.transform`.
+
+```yaml
+regroup_samples:
+  kind: atomic
+  inputs:
+    xs:
+      type: Array<Sample>
+      phase: data
+    inner_len:
+      type: Int
+      phase: run
+  outputs:
+    xss:
+      type: Array<Array<Sample>>
+      phase: data
+  objects:
+    transform:
+      - kind: array_unflatten
+        inputs:
+          xs: inputs.xs
+        outputs:
+          xss: outputs.xss
+  contracts:
+    ensures:
+      - expr: "outputs.xss.view.length * inputs.inner_len.view == inputs.xs.view.length"
+```
+
+That the division is the same for the same input across invocations is a matter of the process's semantics, guaranteed by the implementation. The IR does not verify it. This is the principle of 14.1, that a transform declaration is trusted by the IR processor, applied here.
+
+**Non-normative.**
+
+Where the input of `array_unflatten` contains no Object slots, the outer collection of the output being empty is the natural reading, and the same holds for `array_flatten` where the input contains none. In both cases the slot count is 0 and Object tracking is unaffected, so this specification does not prescribe the behavior.
+
+The output collection of `array_flatten`, and that of `array_unflatten`, has a different index system from the input collection. Passing the output alongside the input to the `each` of one `map` or `fold`, as collections that correspond, is therefore not an intended use. v0 does not check for it, but since the length changes, the `zip: equal` check detects it in most cases.
 
 ---
 
@@ -2790,22 +2826,9 @@ If the effective interval is empty, it is not a validation error; an implementat
 
 Object policies track physical Object identity through `map` and standard `objects.transform`.
 
-For `array_uncons`:
+`array_flatten` and `array_unflatten` are order-preserving total bijections, so the set of Object identities they contain does not change. A policy targeting `inputs.xss` therefore tracks the same Object identities contained in `outputs.xs`.
 
-```text
-xs[0]   -> head
-xs[1..] -> tail[*]
-```
-
-A policy targeting `xs` follows the contained Object identities into both `head` and `tail`.
-
-For `array_reverse`:
-
-```text
-xs[i] -> ys[n - 1 - i]
-```
-
-The policy follows Object identity, not index position.
+As 24.1 says, a policy applies to the Object identities contained in a value rather than to the container, so a change of grouping does not affect what the policy targets.
 
 Policies do not automatically transfer across `consume` / `create` replacement. If policy transfer across physical replacement is needed, it requires explicit policy transfer semantics, which are outside v0.
 
@@ -2922,7 +2945,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 25. `consume` ends an input Object identity.
 26. `create` introduces a new Object identity.
 27. `consume + create` is Object replacement; policy and `.view` metadata do not automatically transfer across replacement.
-28. v0 standard transforms are `array_uncons`, `array_cons`, and `array_reverse`; they have no `params`, require strict role typing, apply only to Object-bearing paths, and are checked using slot-level correspondence rules over Array structure.
+28. v0 standard transforms are `array_flatten` and `array_unflatten`; they have no `params`, require strict role typing, apply only to Object-bearing paths, and fix the correspondence between input and output Object slots as an order-preserving total bijection.
 29. `elidable_iso` is a strong process-level convenience trait and inference permission, not a type trait or structured-control requirement.
 30. For Object-bearing Arrays, `elidable_iso` preserves length, nesting, order, and contained Object identities.
 31. Structured node features are `node_map`, `node_fold`, `node_do_while`, and `node_branch`.

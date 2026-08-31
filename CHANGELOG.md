@@ -39,6 +39,12 @@ specification itself.
   removals above are argued from. Marked **Non-normative**: it constrains future
   revisions of this specification rather than documents, and an implementation
   checks nothing in it.
+- **21.0** the list 2.3 promised: which binding and control sections are valid
+  for each node kind. The rule existed and was enforced; what was missing was
+  anywhere to look it up. Includes a non-normative note on why a repetition over
+  a shared physical resource is a `fold` or a `do_while` and never a `map`.
+- **17** which sections a `map` node has, and that a `bind` value is reused by
+  every invocation while an `each` element goes to exactly one.
 - **11** the binding entries of a node and the input ports of the process it
   invokes are in one-to-one correspondence, for every node kind. Until now the
   rule was stated for the ports (12.1, 12.2) without saying it covered a

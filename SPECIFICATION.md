@@ -654,6 +654,7 @@ invalid transform role set
 transform role type mismatch
 Pure Data path appears in objects.transform
 transform path participates in multiple incompatible Object fates or provenances
+node carries a section that is not valid for its node kind
 map or fold node has no each source
 Object-bearing carry is neither preserved nor replaced by the target process
 node binding names no input port of the target process
@@ -2106,6 +2107,10 @@ process output groups: Array<Cup>
 map output groups: Array<Array<Cup>>
 ```
 
+A `map` node has the binding sections `each` and `bind`. `state`, `carry` and `args` are not valid for `map` (21.0).
+
+An `each` binding is traversed element-wise: each element is passed to exactly one invocation. A `bind` binding is the opposite -- the same value is reused by every invocation and is not updated between them. As 11 requires, `bind` carries Pure Data only, so reuse never affects Object identity. Where the `each` length is zero the target process is not invoked and no `bind` value is used.
+
 `map` requires only Object tracking completeness of the target process. It does not require structured carry compatibility.
 
 In v0, `map` does not define an `outputs` section. A `map` node exposes all declared outputs of the target process, with each output collected into an Array according to the output shape rules below.
@@ -2456,6 +2461,46 @@ If `outputs` is present, the default rules in this section do not apply.
 ---
 
 ## 21. Structured Node Output Summary
+
+### 21.0 Valid sections per node kind
+
+2.3 says that each node kind defines the binding and output-control sections valid for it, and that a section not defined for the kind is a validation error. This is that list.
+
+| Node kind | Binding sections | Control sections |
+|---|---|---|
+| non-structured | `state`, `bind` | - |
+| `map` | `each`, `bind` | - |
+| `fold` | `each`, `bind`, `carry` | `outputs` |
+| `do_while` | `bind`, `carry` | `condition`, `max_iterations`, `outputs` |
+| `branch` | `args` | `condition`, `then`, `else`, `outputs` |
+
+Besides these, every node carries `id`, and every node but a non-structured one carries `kind`. A node names the process it invokes with `process`, except a `branch`, which names one per arm inside `then` and `else`.
+
+Writing a section against a node kind the table does not give it is a validation error. `map` has no `outputs`: its output shape is fixed, every target output `p: T` being exposed as `Array<T>` (17), so v0 defines nothing to shape it with. `condition` means different things by kind: for a `branch` it is a body dataflow reference, and for a `do_while` it names an output of the target process (2.6.7).
+
+**Non-normative.**
+
+An Object-bearing value that every invocation of a structured node shares is bound with `carry`. It cannot be `bind`, which is Pure Data, and it cannot be `each`, which gives each element to exactly one invocation. So a repetition over a shared physical resource is written with `fold` or `do_while`, never with `map`: the Object-bearing inputs of a `map` target are supplied from `each` alone, and `map` therefore expresses only independent operations over Objects that are pairwise distinct.
+
+That follows from the physical fact rather than restricting it. One reagent container cannot be dispensed from by several invocations at once, so an operation over a shared resource is inherently sequential, and which structured node a workflow can be written with says whether its invocations may run in parallel.
+
+```yaml
+# One reagent container used across M plates, in turn
+- id: run
+  kind: fold
+  process: dispense_to_one_plate
+  carry:
+    reagent:
+      from: inputs.reagent        # the container is threaded
+  each:
+    plate:
+      from: inputs.plates         # the plates are traversed
+  outputs:
+    reagent:
+      mode: carry
+    plate:
+      mode: collect
+```
 
 Structured nodes may declare an `outputs` section to control which outputs are exposed by the structured node and how those outputs are shaped.
 
@@ -3019,6 +3064,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 17. Ordinary node invocations use `state` for Object-bearing linear inputs and `bind` for Pure Data inputs.
 18. In `fold` and `do_while`, `carry` is loop-carried and may be Pure Data or Object-bearing.
 19. `branch` uses `args`, not `state`; Object-bearing branch arguments are supplied only to the selected arm. For a `branch`, the correspondence of rule 19a holds against each arm separately.
+18a. Each node kind has a fixed set of valid binding and control sections (21.0); writing another against it is a validation error. `map` has no `outputs` section.
 19a. The binding entries of a node and the input ports of the process it invokes are in one-to-one correspondence: every input port is bound exactly once across the binding sections valid for the node kind, and every binding entry names an input port. v0 defines no default value for an input port.
 19b. A `map` node and a `fold` node must each have at least one `each` source; their traversal length is otherwise undetermined. `do_while` has no such requirement.
 19c. For an Object-bearing carry, the target process either has the carried input port's fate be the same-name output port, or consumes that input port and creates that output port. No other arrangement is valid.

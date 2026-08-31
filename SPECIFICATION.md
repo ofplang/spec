@@ -25,6 +25,34 @@ The key goals of v0 are:
 7. Express common operational grouping through nominal type traits rather than subtyping or parameterized Object types.
 8. Keep contract-visible views and trait membership explicit in YAML, except for v0 built-in primitive and Array views.
 9. Keep feature derivation mostly syntactic and easy to validate from YAML structure.
+10. Keep the shape of the Object-flow graph statically determined. Information that becomes known only at run time is admitted solely as a finite scalar parameter that indexes that shape; it may not change the shape itself.
+
+### 1.1 Design principle: static shape
+
+The central design decision of v0 is that the shape of the Object-flow graph is statically determined. Information that becomes known only at run time is admitted solely as a finite scalar parameter that indexes that shape.
+
+Every structured node kind is designed to that principle:
+
+| Node | Shape | Run-time parameter | Source of finiteness |
+|---|---|---|---|
+| `map` | the body L times, in parallel | collection length L | length of `each` |
+| `fold` | the body L times, in series | collection length L | length of `each` |
+| `do_while` | the body n times, in series | iteration count n | `max_iterations` |
+| `branch` | a single shape | none | - |
+
+The shape of `map`, `fold`, and `do_while` is one family indexed by a single scalar. Object consumption can therefore be estimated symbolically as `L x cost` or `n x cost`, and for `do_while` the bound is static, given by `max_iterations`. The series of Objects held by a carry slot is one series whatever n is: n stretches its length and does not change its form.
+
+`branch` is the only node kind without that property. If the two arms were allowed to differ in how they route Object identity, the shape would not be one family but the disjoint union of two shapes, and that is multiplicative under composition: a composite containing k branches would have up to 2^k resource profiles and Object series. Resource estimates such as the number of plates consumed, and the tracking of an individual Object, could then no longer be stated statically.
+
+Section 20 requires the two arms to agree on the Object identities they expose for that reason. **`branch` is a branch in the Data dimension, and must be an identity in the Object dimension.** A conditional repetition that consumes and creates Objects is written with `do_while`, which satisfies this principle because it pushes its shape into the scalar n and bounds it with `max_iterations`.
+
+For the same reason v0 does not admit a `branch` whose arms declare different port names, an Object-bearing output produced by one arm only, or a conditional Object creation or consumption.
+
+**Restated in terms of resources**
+
+This principle guarantees that the upper bound on the physical resources a workflow needs is fixed before the workflow runs. Just as `max_iterations` bounds the iteration count, the static shape of the Object-flow graph bounds the number of Objects consumed. A description whose consumption depends on a branch taken at run time is not admitted for that reason.
+
+An operation whose consumed quantity genuinely varies at run time is expressed by pushing the variation inside an atomic process and passing that process the Objects corresponding to the bound. Where a reagent container must be replaced depending on the number of dispenses, for example, the process is written to take an `Array<Reagent>` of the estimated upper bound and to return the remainder. Which container is dispensed from is the implementation's internal business and is not visible in the Object flow the document describes.
 
 ---
 

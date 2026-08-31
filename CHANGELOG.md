@@ -30,6 +30,22 @@ specification itself.
   removals above are argued from. Marked **Non-normative**: it constrains future
   revisions of this specification rather than documents, and an implementation
   checks nothing in it.
+- **11** the binding entries of a node and the input ports of the process it
+  invokes are in one-to-one correspondence, for every node kind. Until now the
+  rule was stated for the ports (12.1, 12.2) without saying it covered a
+  structured node, and nothing said a binding entry must name a port at all.
+  For a `branch` the correspondence holds against each arm, which is what makes
+  the two arms agree on their input ports through `args`.
+- **17**, **18** a `map` node and a `fold` node must have at least one `each`
+  source. Their shape is the body L times, and with no `each` source there is no
+  L. `do_while` has no counterpart requirement, and 19 now says why.
+- **16** an Object-bearing carry must be threaded: the carried input port's fate
+  is the same-name output port, or that input is consumed and that output
+  created. The section listed those two forms already but permissively, so a
+  third arrangement -- the carried Object leaving through a collected output
+  while the carry output is created -- was accounted for and yet had no
+  expressible Object correspondence for the node, since it would have to name a
+  position within a collection.
 - **1**, design goal 10: the shape of the Object-flow graph is statically
   determined, and run-time information may only index that shape as a finite
   scalar parameter.

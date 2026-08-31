@@ -1490,6 +1490,12 @@ Example ordinary node invocation:
 
 `bind` is Pure Data only. Object-bearing values must not be passed through `bind`.
 
+The binding entries of a node and the input ports of the process it invokes are in one-to-one correspondence. Every input port of the target process must be bound exactly once, across all binding sections valid for the node's kind (21.0), and every binding entry must name an input port of the target process. Both directions are validation errors when they fail: an unbound input port, an input port bound in two sections or twice in one section, and a binding entry that names no input port of the target.
+
+This applies to every node kind. v0 defines no default value for an input port, so no port is exempt from being bound, and it holds for Pure Data ports as well as Object-bearing ones: 12.1 gives a Pure Data input port an indegree of exactly one, not of at least zero.
+
+For `branch`, the target is each arm, and `args` is the only binding section (21.0). The correspondence therefore holds against each arm separately: an input port of either arm that no argument names, and an argument that names no input port of one of the arms, are both validation errors. Together with the same-type requirement of section 20, this makes the two arms agree on their input ports through `args`.
+
 Literal values are written under `value`:
 
 ```yaml
@@ -2011,9 +2017,20 @@ A carry value may be Pure Data or Object-bearing.
 
 Structured carry compatibility does not imply physical Object identity preservation. It guarantees that a same-name, same-type, same-phase value is threaded across loop iterations.
 
-For Object-bearing carry, the Object behavior of that carry value is determined independently by ordinary Object tracking completeness. A carry transition may preserve physical identity through `map` or `transform`, or may replace the Object-bearing value by consuming the input carry value and creating a same-name, same-type output carry value.
+For Object-bearing carry, the target process must relate the carried input port to the same-name output port in one of exactly two ways:
 
-For Pure Data carry, the target process's same-name output becomes the next iteration's carry value. Pure Data carry is not subject to Object tracking or linearity restrictions.
+```text
+the fate of the carried input port is the same-name output port
+  (the carry transition preserves physical identity), or
+the carried input port is consumed and the same-name output port is created
+  (the carry transition replaces the Object)
+```
+
+Any other arrangement is a validation error. In particular it is an error for the fate of the carried input port to be a different output port, or for the same-name output port to have a provenance other than the carried input port or a `create`.
+
+The reason is that the carried Object would otherwise leave the loop, or enter it, through a collected output or an `each` element, and the node's own Object correspondence would then have to name a position within a collection -- the first collected element, or the last element traversed. v0 does not address collection elements through an Object path (2.6.2), and 1.1 admits a shape indexed by a scalar rather than one that varies by position, so such a node has no expressible Object correspondence. Both permitted forms avoid this: identity preservation carries the same slot through, and replacement creates and consumes its intermediate Objects within the node, so the accounting closes there.
+
+For Pure Data carry, the target process's same-name output becomes the next iteration's carry value. Pure Data carry is not subject to Object tracking or linearity restrictions, and the requirement above does not apply to it: Data has no identity, so the same-name output is the next carry value whatever it was computed from, which is the ordinary case of an accumulator.
 
 `branch` does not use `carry` in v0. It uses `args` and explicit or implicit `common` outputs instead.
 
@@ -2060,6 +2077,8 @@ zip: equal
 
 All `each` inputs of the same `map` must have equal top-level Array length. If a length mismatch is determined at `graph` phase, it is a graph-time validation error. If it is first determined at `run` phase, it is a run-start validation error or preflight error. If it is first determined at `data` phase, it is a runtime data error.
 
+A `map` node must have at least one `each` source. The shape of a `map` is its body L times, indexed by the traversal length L (1.1), and L is the common length of the `each` sources; with no `each` source there is no L and nothing determines how many invocations the node performs. An absent `each` section and an empty one are the same error.
+
 If the `each` length is zero, the map performs zero invocations and produces empty collected outputs.
 
 ---
@@ -2098,12 +2117,13 @@ Example:
 Requirements:
 
 1. Target process is Object tracking complete.
-2. Each `carry` binding has a same-name, same-type, same-phase output on the target process.
-3. Carry outputs may be Pure Data or Object-bearing and must be exposed with `mode: carry` when `outputs` is present.
-4. Non-carry Pure Data outputs may be exposed only using explicit output modes.
-5. Non-carry Object-bearing outputs are allowed only with explicit `mode: collect`.
-6. `bind` inputs are Pure Data only.
-7. Multiple `each` inputs use zip-equal semantics, with phase-dependent error classification for length mismatches.
+2. Each `carry` binding has a same-name, same-type, same-phase output on the target process, and an Object-bearing carry satisfies the threading requirement of section 16.
+3. At least one `each` source is present. As for `map`, the shape of a `fold` is its body L times and L is the common length of the `each` sources, so with no `each` source nothing determines how many invocations the node performs. An absent `each` section and an empty one are the same error.
+4. Carry outputs may be Pure Data or Object-bearing and must be exposed with `mode: carry` when `outputs` is present.
+5. Non-carry Pure Data outputs may be exposed only using explicit output modes.
+6. Non-carry Object-bearing outputs are allowed only with explicit `mode: collect`.
+7. `bind` inputs are Pure Data only.
+8. Multiple `each` inputs use zip-equal semantics, with phase-dependent error classification for length mismatches.
 
 Object-bearing `each` values are not carry values. They follow ordinary Object tracking rules for the target process.
 
@@ -2201,11 +2221,13 @@ Example:
 Requirements:
 
 1. Target process is Object tracking complete.
-2. Each `carry` binding has a same-name, same-type, same-phase output on the target process.
+2. Each `carry` binding has a same-name, same-type, same-phase output on the target process, and an Object-bearing carry satisfies the threading requirement of section 16.
 3. Object-bearing outputs of the target process must be carry outputs. Non-carry Object-bearing outputs are forbidden in `do_while`.
 4. `condition.output` names a Boolean Data output of the target process.
 5. `max_iterations` is required and must be a graph/run phase integer.
 6. Non-carry Data outputs may be exposed only using explicit output modes.
+
+`do_while` has no `each` section and requires no `carry` binding. Its iteration count comes from the condition output and `max_iterations` rather than from a traversal length, which is why the requirement `map` and `fold` carry -- at least one `each` source -- has no counterpart here. A `do_while` with no carry binding is meaningful: its target is a physical operation, and the condition output it returns may differ between invocations even though the node binds the same values each time.
 
 `condition.output` is an output name, not a body-scope dataflow reference. The condition output is evaluated after each invocation of the target process. The `do_while` node repeats while this output value is `true` and exits when it is `false`, subject to `max_iterations`.
 
@@ -2936,7 +2958,10 @@ Implementations may report validation, portability, unsupported-feature, and ext
 16. Object-bearing values are normally `data` phase; rare `run` phase is allowed; `graph` phase is invalid.
 17. Ordinary node invocations use `state` for Object-bearing linear inputs and `bind` for Pure Data inputs.
 18. In `fold` and `do_while`, `carry` is loop-carried and may be Pure Data or Object-bearing.
-19. `branch` uses `args`, not `state`; Object-bearing branch arguments are supplied only to the selected arm.
+19. `branch` uses `args`, not `state`; Object-bearing branch arguments are supplied only to the selected arm. For a `branch`, the correspondence of rule 19a holds against each arm separately.
+19a. The binding entries of a node and the input ports of the process it invokes are in one-to-one correspondence: every input port is bound exactly once across the binding sections valid for the node kind, and every binding entry names an input port. v0 defines no default value for an input port.
+19b. A `map` node and a `fold` node must each have at least one `each` source; their traversal length is otherwise undetermined. `do_while` has no such requirement.
+19c. For an Object-bearing carry, the target process either has the carried input port's fate be the same-name output port, or consumes that input port and creates that output port. No other arrangement is valid.
 20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths.
 21. Composite Object behavior is derived from body graph flow and `returns`.
 22. All processes must satisfy Object tracking completeness.

@@ -82,6 +82,23 @@ specification itself.
 
 ### Changed
 
+- **15** the process-level marker `elidable_iso` is renamed
+  `object_identity_map`, and the section it is declared in moves from a
+  process's `traits` to its `behavior`. Two different things were called traits:
+  a type trait, which is a predicate on a type declared in the top-level
+  `traits` section, and a marker on a process. `elidable` also described the
+  wrong thing -- what may be elided is the `objects` section, not the process,
+  which may update views or consume time -- and `iso` was weaker than the
+  requirement, since a cross-wired `objects.map` is an isomorphism and does not
+  qualify. `object_identity_map` names what the marker actually asserts and
+  matches the `objects.map` it infers.
+- **2.4** `behavior` is reserved. `traits` stays reserved as the name of the
+  top-level section that declares type traits.
+- **15** the marker vocabulary is closed: `object_identity_map` is the only one
+  v0 defines, and any other `behavior` entry is a validation error. Nothing
+  checked a process-level marker's spelling before.
+
+
 - **14.4.1** the correspondence between a transform's input and output Object
   slots is now an order-preserving total bijection over traversal order, in
   place of the index variables and slice notation (`i`, `*`, `0`, `1..`). No

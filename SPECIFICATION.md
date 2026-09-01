@@ -201,10 +201,11 @@ script
 contracts
 requires
 ensures
+behavior
 exhausted
 ```
 
-Every name in that list but the last is a structural key of the document. `exhausted` is there for the other reason a name is reserved: a `do_while` node exposes a reserved output of that name (19.3), so were a target process free to declare an output called `exhausted`, a reference to `<node>.exhausted` would name two different values and there would be no way to say which.
+Every name in that list but the last is a structural key of the document. `traits` stays reserved as the name of the top-level section that declares type traits (7.3); a process declares its behavior markers under `behavior` (15), which is a different vocabulary. `exhausted` is there for the other reason a name is reserved: a `do_while` node exposes a reserved output of that name (19.3), so were a target process free to declare an output called `exhausted`, a reference to `<node>.exhausted` would name two different values and there would be no way to say which.
 
 View field names are deliberately absent from that list: they must match the identifier grammar and must not contain `.`, but a reserved name is allowed. A view field name occurs in only two places, and in neither can it be confused with a structural key. In a view schema the field name is the outer key and the declaration keys `type` and `value` are inside it, so `value: {type: Int}` declares a field named `value`. In a contract reference the field is the single segment after `.view`, so `inputs.x.view.value` reads that field. Reserving names here would cost expressiveness without removing an ambiguity.
 
@@ -655,6 +656,7 @@ transform role type mismatch
 Pure Data path appears in objects.transform
 transform path participates in multiple incompatible Object fates or provenances
 node carries a section that is not valid for its node kind
+process declares a behavior marker v0 does not define
 map or fold node has no each source
 Object-bearing carry is neither preserved nor replaced by the target process
 node binding names no input port of the target process
@@ -903,7 +905,7 @@ Float
 
 `Numeric` is a closed built-in trait in v0. It must not be redeclared in the document's top-level `traits` section, and user-defined types must not implement `Numeric`. `Numeric` may be used only as a generic type constraint over v0 primitive numeric types.
 
-This does not affect process-level inference markers such as `elidable_iso`, which are not type traits.
+Process-level behavior markers are declared under a process's `behavior` section (15) and are a separate vocabulary; they are not type traits and this section does not govern them.
 
 All non-built-in type trait names used by user-defined types or generic constraints must be declared in the document's top-level `traits` section.
 
@@ -1249,7 +1251,7 @@ Whitespace is allowed only immediately inside the angle brackets. Therefore `Pla
 
 The trait name must be either a declared document-defined trait or the built-in trait `Numeric`. The type parameter name must name a type parameter declared by the same process. Constraints over concrete types, multiple type arguments, unknown traits, unknown type parameters, and malformed constraints are validation errors.
 
-Generic atomic process Object tracking is validated after instantiation. The process definition is first checked for syntactic correctness of paths, roles, and declarations. After concrete types are inferred, Object-bearing slots are computed and `objects` completeness, `elidable_iso` inference, transform role typing, and Object linearity are checked on the instantiated process signature.
+Generic atomic process Object tracking is validated after instantiation. The process definition is first checked for syntactic correctness of paths, roles, and declarations. After concrete types are inferred, Object-bearing slots are computed and `objects` completeness, `object_identity_map` inference, transform role typing, and Object linearity are checked on the instantiated process signature.
 
 A type parameter has no phase. Phase is a property of process ports, not of types or type parameters.
 
@@ -1680,7 +1682,7 @@ unknown Object input fate
 
 All atomic and composite processes must satisfy Object tracking completeness.
 
-For atomic processes, this is checked from the `objects` section or from the special elidable inference rule. For composite processes, this is derived from the body graph and `returns`.
+For atomic processes, this is checked from the `objects` section or from the `object_identity_map` inference rule (15). For composite processes, this is derived from the body graph and `returns`.
 
 Object tracking completeness describes successful invocation behavior. Runtime failures and exceptions are out of scope for v0.
 
@@ -2006,19 +2008,19 @@ The output collection of `array_flatten`, and that of `array_unflatten`, has a d
 
 ---
 
-## 15. Elidable Iso
+## 15. Object Identity Map
 
-`elidable_iso` is a strong, convenient process-level trait and inference permission. It is not a type trait, and it is not the general condition for structured control.
+`object_identity_map` is a process-level behavior marker and inference permission. It is not a type trait, and it is not the general condition for structured control.
 
 ```text
-elidable_iso:
+object_identity_map:
   A same-name, same-type, same value-structure, physical identity-preserving
   mapping from Object-bearing inputs to Object-bearing outputs.
 ```
 
-For an Object-bearing input and output with the same name and the same type, `elidable_iso` means that the output is the same logical value structure as the input and that all contained Object identities are preserved at corresponding Object slots.
+For an Object-bearing input and output with the same name and the same type, `object_identity_map` means that the output is the same logical value structure as the input and that all contained Object identities are preserved at corresponding Object slots.
 
-For Object-bearing Arrays, this implies that Array length, nesting structure, element order, and contained Object identities are preserved. A process that changes Array length, order, grouping, or nesting is not `elidable_iso`.
+For Object-bearing Arrays, this implies that Array length, nesting structure, element order, and contained Object identities are preserved. A process that changes Array length, order, grouping, or nesting does not have this marker.
 
 Implementations may approximate this check by verifying that corresponding `object_slots` are mapped identity-preservingly and that no Object-bearing structural transform is declared.
 
@@ -2028,11 +2030,11 @@ Example:
 processes:
   cup_inspect:
     kind: atomic
-    traits:
-      - elidable_iso
+    behavior:
+      - object_identity_map
 ```
 
-For atomic processes, if `objects` is completely omitted and the process has the process-level trait `elidable_iso`, v0 may infer same-name mappings for top-level Object-bearing inputs and outputs.
+For atomic processes, if `objects` is completely omitted and the process declares `object_identity_map`, v0 may infer same-name mappings for top-level Object-bearing inputs and outputs.
 
 Canonical inferred form:
 
@@ -2042,7 +2044,11 @@ objects:
     outputs.cup: inputs.cup
 ```
 
-If an `objects` section is present, no implicit completion is performed. The written `objects` section must account for all Object-bearing input and output slots.
+If an `objects` section is present, no implicit completion is performed. The written `objects` section must account for all Object-bearing input and output slots. The marker is then a statement about how the process behaves, which the written `objects` section must agree with.
+
+`object_identity_map` is the only behavior marker v0 defines. A `behavior` entry naming anything else is a validation error. The section is named for what it describes rather than for this one marker, so a later revision can add a marker about a property other than Object behavior -- execution time, idempotence, reversibility -- without the section name having to change.
+
+**This marker does not say the process is a no-op.** A process may update `.view` metadata, consume time, or have any other effect that Object behavior does not describe. What it grants is a licence to infer the Object mapping and to reason about Object behavior; it says nothing about whether the process must be executed.
 
 ---
 
@@ -3077,8 +3083,8 @@ Implementations may report validation, portability, unsupported-feature, and ext
 26. `create` introduces a new Object identity.
 27. `consume + create` is Object replacement; policy and `.view` metadata do not automatically transfer across replacement.
 28. v0 standard transforms are `array_flatten` and `array_unflatten`; they have no `params`, require strict role typing, apply only to Object-bearing paths, and fix the correspondence between input and output Object slots as an order-preserving total bijection.
-29. `elidable_iso` is a strong process-level convenience trait and inference permission, not a type trait or structured-control requirement.
-30. For Object-bearing Arrays, `elidable_iso` preserves length, nesting, order, and contained Object identities.
+29. `object_identity_map` is a process-level behavior marker and inference permission, declared under a process's `behavior` section; it is not a type trait or a structured-control requirement, and it does not say the process may be skipped.
+30. For Object-bearing Arrays, `object_identity_map` preserves length, nesting, order, and contained Object identities.
 31. Structured node features are `node_map`, `node_fold`, `node_do_while`, and `node_branch`.
 32. `map` requires only Object tracking completeness and exposes all target process outputs as Array outputs; v0 does not define `map.outputs`.
 33. `fold` and `do_while` require structured carry compatibility for carry outputs; `fold` also allows non-carry Object-bearing outputs only with explicit `mode: collect`.

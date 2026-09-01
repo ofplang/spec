@@ -61,6 +61,18 @@ specification itself.
   while the carry output is created -- was accounted for and yet had no
   expressible Object correspondence for the node, since it would have to name a
   position within a collection.
+- **12.4 Object skeleton.** A process's skeleton is a partial injection from its
+  input Object slots to its output Object slots, the input slots it consumes,
+  and the output slots it creates, each created slot carrying the node at which
+  it is created. Sections 13, 14.4.1, 15, 20.2 and 24.1 were each describing a
+  part of this and are now stated in terms of it. The skeleton relates the slot
+  families of two collections by a correspondence kind rather than by position,
+  so it never enumerates a collection and never names an index, and equality is
+  the comparison of two normal forms.
+- **12.4.7** every process and node has exactly one skeleton. Where a construct
+  has several descriptions of which one runs, they must all have equal
+  skeletons; `branch` is the only such construct in v0. This is stronger than
+  the principle of 1.1, which 1.1 now says.
 - **19.3** a `do_while` node exposes a reserved Boolean output `exhausted`, true
   when it terminated by reaching `max_iterations` with the condition still true.
   Whether the limit was reached is a fact about the node rather than about the

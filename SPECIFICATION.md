@@ -52,6 +52,8 @@ For the same reason v0 does not admit a `branch` whose arms declare different po
 
 This principle guarantees that the upper bound on the physical resources a workflow needs is fixed before the workflow runs. Just as `max_iterations` bounds the iteration count, the static shape of the Object-flow graph bounds the number of Objects consumed. A description whose consumption depends on a branch taken at run time is not admitted for that reason.
 
+This principle is weaker than the uniqueness of the Object skeleton (12.4.7). Two descriptions may agree on how many Objects they consume and create and still have different skeletons, if what an output Object's identity comes from is not the same; 12.4.7 forbids that separately.
+
 An operation whose consumed quantity genuinely varies at run time is expressed by pushing the variation inside an atomic process and passing that process the Objects corresponding to the bound. Where a reagent container must be replaced depending on the number of dispenses, for example, the process is written to take an `Array<Reagent>` of the estimated upper bound and to return the remainder. Which container is dispensed from is the implementation's internal business and is not visible in the Object flow the document describes.
 
 ---
@@ -657,6 +659,7 @@ Pure Data path appears in objects.transform
 transform path participates in multiple incompatible Object fates or provenances
 node carries a section that is not valid for its node kind
 process declares a behavior marker v0 does not define
+process Object skeleton is not complete
 map or fold node has no each source
 Object-bearing carry is neither preserved nor replaced by the target process
 node binding names no input port of the target process
@@ -1656,6 +1659,150 @@ body:
 
 Here `step.cup` is connected to the composite output port `cup`; it is not unused.
 
+### 12.4 Object skeleton
+
+The **Object skeleton** of a process is the description of where that process moves Object identity to, and nothing else. Types, Pure Data, view metadata, execution content, and time are not part of it.
+
+#### 12.4.1 Components of a skeleton
+
+For a process `p`, after generic instantiation:
+
+```text
+In(p)  = the union of the object_slots of p's input ports
+Out(p) = the union of the object_slots of p's output ports
+```
+
+The skeleton `S(p)` is a triple:
+
+```text
+phi : a partial injection from In(p) to Out(p)   the correspondence
+C   : the slots of In(p) outside the domain of phi   consumed
+N   : the slots of Out(p) outside the image of phi   created
+      each slot in N carries a creation-point identifier (12.4.3)
+```
+
+That `phi` is injective is what says no Object is duplicated. That it is partial is what allows one to be consumed.
+
+For a scalar Object-bearing port the port is one slot. For a collection port the slots are a family indexed at run time, and v0 relates two such families by a correspondence kind (12.4.2) rather than by position. A skeleton therefore never enumerates the slots of a collection and never names an index.
+
+#### 12.4.2 Correspondence between collection slots
+
+A **correspondence kind** classifies how two slot families correspond. v0 defines two:
+
+```text
+identity          nesting structure, order, and position all agree
+order_preserving  traversal order is preserved; nesting structure may differ
+```
+
+`identity` is a special case of `order_preserving`, but the two are distinct labels for the purpose of skeleton equality (12.4.3).
+
+A later revision may add kinds. Because a kind is a label drawn from a finite set, adding one changes neither the shape of the normal form nor the equality procedure; it adds a label the first part of the normal form may carry.
+
+#### 12.4.3 Normal form and equality
+
+The **normal form** of a skeleton is:
+
+```text
+Part 1  the input slot names in dictionary order, each carrying a row value:
+        (output slot name, correspondence kind), or `consumed`
+
+Part 2  the created output slot names in dictionary order, each carrying its
+        creation-point identifier
+```
+
+Two skeletons are **equal** when their normal forms agree. The normal form is determined by the skeleton, so equality is a comparison of two pieces of finite data and needs no reasoning about the structure of the correspondence.
+
+A **creation-point identifier** names the place at which an Object identity first becomes observable from the rest of the graph. In v0 that place is a node in a body.
+
+```text
+non-structured node       that node
+map / fold / do_while     that node
+branch                    that node, not the arm
+inside a composite        the interior node's identifier, carried outward by returns
+```
+
+The creation point is a node rather than a process definition because the same process invoked from two nodes creates two different physical Objects.
+
+```yaml
+nodes:
+  - id: a
+    process: cup_create     # a.cup
+  - id: b
+    process: cup_create     # b.cup, a different cup
+```
+
+Where a `branch` creates an Object in both arms, the creation point is the `branch` node in both cases. Whichever arm runs, one new Object appears at that node's output, and where its identity came from does not depend on the arm.
+
+A skeleton computed for a process *definition* has undetermined creation points, since the node that will invoke it is not known there. Equality is decided between skeletons placed at nodes.
+
+#### 12.4.4 Skeleton of an atomic process
+
+An atomic process's skeleton is read directly from its `objects` section:
+
+```text
+objects.map        adds the named pair to phi, with correspondence kind identity
+objects.transform  adds the correspondence the kind defines (14.4) to phi,
+                   with correspondence kind order_preserving
+objects.consume    adds the named input slot to C
+objects.create     adds the named output slot to N, its creation point being the
+                   node that invokes the process
+```
+
+A process that omits `objects` entirely and declares `object_identity_map` has the skeleton that 15 infers.
+
+`objects.map` and `objects.transform` both add to `phi` and differ only in the correspondence kind. They are separate sections because a correspondence between whole ports is most readably written as a pair of names, and one that changes nesting is most readably written as a kind; the distinction is one of notation, not of structure.
+
+#### 12.4.5 Composition of skeletons
+
+A composite's skeleton is composed along its body. Every Object-bearing value in a body is referred to exactly once (11, 12.2), so each Object slot has one path through the body and the composition is determined.
+
+**Non-structured node.** The target process's skeleton, placed at this node.
+
+**`map` node.** The target's skeleton lifted element-wise: the input side is the slot family of the `each` source, the output side the slot family of the collected output. The lift does not change the correspondence kind, since it lifts the relation between elements to a relation between the collections holding them. A slot the target creates is created at the `map` node.
+
+**`fold` and `do_while` carry slot.** The target's skeleton restricted to the carried port. By 16 the restriction is one of two things, and the node's skeleton follows:
+
+```text
+a correspondence   the node's carry input slot corresponds to its carry output
+                   slot, with the correspondence kind the target gives it
+
+consume + create   the node consumes its carry input slot and creates its carry
+                   output slot, the creation point being the node
+```
+
+The Objects created by intermediate iterations are consumed within the same node, so the accounting closes there whatever the iteration count is. This is why a skeleton is determined for `fold` and `do_while` although their iteration count is not known until run time.
+
+**`fold` collect output.** The target's output slot lifted to the slot family of the collected output, as for `map`.
+
+**`branch` node.** Both arms' skeletons must be equal, and the node's skeleton is that common skeleton (20.2).
+
+**Composite process.** Composed along the body's bindings and `returns`, starting from the composite's own input port slots and ending at its output port slots. An input port slot that appears in no node binding and in no `returns` entry is in neither the domain of `phi` nor `C`, and an output port slot with no `returns` entry is in neither the image of `phi` nor `N`; 12.4.6 fails in both cases. A composite has no `objects` section to declare a consumption or a creation with (10.2), so its body must account for every boundary slot.
+
+#### 12.4.6 Completeness of a skeleton
+
+A skeleton is **complete** when:
+
+```text
+every slot of In(p)  is in exactly one of dom(phi) and C
+every slot of Out(p) is in exactly one of im(phi) and N
+```
+
+#### 12.4.7 Uniqueness of a skeleton
+
+Every process and every node must have exactly one skeleton.
+
+Where a construct has several descriptions of which one runs, the skeletons of those descriptions must be equal in the sense of 12.4.3. If they are not, the skeleton is not determined, and the origin of the identity of an output Object slot depends on a choice made at run time. Every place downstream that refers to that Object -- a binding on a later node, a `body.returns` entry, the target of a scheduling policy -- then has no determined answer.
+
+In v0, `branch` is the only construct with several descriptions. Every other has one, so its skeleton is determined by construction. `fold` and `do_while` decide their iteration count at run time, but by 12.4.5 their skeleton does not depend on it.
+
+This requirement is stronger than the principle of 1.1. The number of Objects consumed and created may agree between two descriptions and their skeletons still differ, if what an output Object's identity comes from is not the same.
+
+#### 12.4.8 Computational cost
+
+Computing a skeleton takes one traversal of the body graph. A correspondence kind is drawn from a finite set, and equality compares slot names, kinds, and creation-point identifiers. Computing and comparing skeletons is therefore linear in the size of the document.
+
+Nothing in it requires index arithmetic, polynomial normalization, or constraint solving. An implementation that finds it needs any of those has diverged from this section.
+
 ---
 
 ## 13. Object Tracking Completeness
@@ -1664,10 +1811,10 @@ Object tracking completeness is the central well-formedness property for Object 
 
 ```text
 Object tracking completeness:
-  Every Object-bearing input port slot and output port slot of a process must have a complete,
-  explicit, derivable explanation in terms of map, consume, create, transform,
-  body graph flow, or returns.
+  A process's Object skeleton (12.4) must be complete (12.4.6).
 ```
+
+Equivalently: every Object-bearing input port slot and output port slot of a process has exactly one explanation, in terms of `map`, `consume`, `create`, `transform`, body graph flow, or `returns`.
 
 It forbids:
 
@@ -1682,7 +1829,7 @@ unknown Object input fate
 
 All atomic and composite processes must satisfy Object tracking completeness.
 
-For atomic processes, this is checked from the `objects` section or from the `object_identity_map` inference rule (15). For composite processes, this is derived from the body graph and `returns`.
+The skeleton is read from the `objects` section for an atomic process, or from the `object_identity_map` inference rule (15) where `objects` is omitted, and composed along the body graph and `returns` for a composite (12.4.4, 12.4.5).
 
 Object tracking completeness describes successful invocation behavior. Runtime failures and exceptions are out of scope for v0.
 
@@ -1878,7 +2025,7 @@ array_unflatten:
 
 In each case, the same `T` must be used consistently within that transform entry, and the referenced paths must be Object-bearing after type resolution.
 
-Each transform kind fixes the correspondence between its input Object slots and its output Object slots as an **order-preserving total bijection**: the Object slots contained in the input, listed in traversal order, and those contained in the output, listed in traversal order, correspond one to one in that order.
+Each transform kind contributes to the process's Object skeleton a correspondence of kind `order_preserving` (12.4.2). It fixes the correspondence between its input Object slots and its output Object slots as an **order-preserving total bijection**: the Object slots contained in the input, listed in traversal order, and those contained in the output, listed in traversal order, correspond one to one in that order.
 
 Traversal order is from first to last within a collection, and outer-first dictionary order through nested collections.
 
@@ -2935,6 +3082,8 @@ For `Array<Sample>`, this means:
 object_slots(value) = elements[*]
 ```
 
+Which physical Object identities a policy targets is decided by following the Object skeleton (12.4). Tracing the correspondence `phi` gives the identities contained in the value `object.from` names. A slot the skeleton consumes leaves policy tracking at that point.
+
 ### 24.2 Object lifetime and effective interval
 
 For policy purposes, an Object is considered available to the workflow from the start of the process that creates or introduces it until the end of the process that consumes or exports it from the current scope.
@@ -3075,7 +3224,8 @@ Implementations may report validation, portability, unsupported-feature, and ext
 19b. A `map` node and a `fold` node must each have at least one `each` source; their traversal length is otherwise undetermined. `do_while` has no such requirement.
 19c. For an Object-bearing carry, the target process either has the carried input port's fate be the same-name output port, or consumes that input port and creates that output port. No other arrangement is valid.
 20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths.
-21. Composite Object behavior is derived from body graph flow and `returns`.
+21. Composite Object behavior is derived from body graph flow and `returns`, as the composition of the body's node skeletons (12.4.5).
+21a. A process's Object skeleton is the triple of a partial injection from its input Object slots to its output Object slots, the input slots it consumes, and the output slots it creates, each created slot carrying the node at which it is created. Object tracking completeness is completeness of that skeleton (12.4.6), and every process and node must have exactly one (12.4.7).
 22. All processes must satisfy Object tracking completeness.
 23. Every Object slot must have exactly one fate or provenance.
 24. `map` preserves physical identity.

@@ -648,7 +648,7 @@ script process contains an objects section
 script process declares an unsupported script language
 fold or do_while carry output is missing
 branch arm has one-sided Object-bearing output
-branch common Object-bearing output is not identity-equivalent across arms
+branch arms have unequal Object skeletons
 Object-bearing value has graph phase
 Object slot has multiple incompatible fates
 Object slot has multiple incompatible provenances
@@ -2532,7 +2532,7 @@ Requirements:
 3. An Object-bearing branch argument is made available only to the selected arm and is not fan-out.
 4. Branch outputs are common outputs selected from the executed arm.
 5. One-sided Object-bearing outputs are forbidden in v0.
-6. A common Object-bearing branch output must be identity-equivalent across arms.
+6. The two arms must have equal Object skeletons (20.2).
 7. v0 does not provide Optional, Result, union-like branch outputs, conditional Object provenance, or policy transfer semantics.
 
 If `else` is omitted, it acts as an implicit identity arm for branch arguments for the purpose of Object-bearing common outputs. The implicit else arm returns each Object-bearing branch argument as a same-name Object-bearing output with the same type, phase, and physical identity. It does not implicitly expose Data outputs. Therefore, Data outputs from the `then` arm cannot be exposed as common outputs unless an explicit `else` arm is provided and the corresponding outputs are valid as common Data outputs.
@@ -2552,7 +2552,7 @@ Rules when `outputs` is present:
 2. `mode: common` may be used for outputs present in both arms with the same name, type, and phase. The output may be Pure Data or Object-bearing.
 3. If an output listed as `common` is missing from either arm, it is a validation error.
 4. If an output listed as `common` has different type or phase across arms, it is a validation error.
-5. If an Object-bearing output listed as `common` is not identity-equivalent across arms, it is a validation error.
+5. If the two arms' Object skeletons are unequal, it is a validation error (20.2).
 6. `mode: drop` may be used only for Data outputs.
 7. Any Object-bearing output produced by either arm must be listed with `mode: common`.
 8. Unlisted Data outputs are dropped.
@@ -2580,22 +2580,44 @@ Example with explicit outputs:
 
 For this branch to be valid, both `sample_process_a` and `sample_process_b` must expose `outputs.sample` as the same Object identity as the branch argument `args.sample`.
 
-### 20.2 Branch Object identity equivalence
+### 20.2 Branch Object skeleton
 
-A common Object-bearing branch output must have the same Object identity behavior in every arm. v0 intentionally forbids branch outputs whose Object identity may depend on which arm was selected.
+A `branch` node has no `objects` section. Its skeleton is derived from the two arms: from the `objects` section where an arm is atomic, and from the body graph where it is composite (12.4.4, 12.4.5).
 
-For branch validation, the Object behavior of each arm is compared at Object slot level. An Object-bearing output slot is identity-equivalent across arms only when each arm derives that output slot from the same branch argument Object slot through identity-preserving `map` declarations or the same standard identity-preserving structural transform relation.
+**The two arms' skeletons must be equal in the sense of 12.4.3, with both placed at the `branch` node.** If they are not, it is a validation error. If they are, the node's skeleton is that common skeleton, and the node's skeleton is therefore determined whichever arm runs.
 
-The following are validation errors for a common Object-bearing branch output in v0:
+**Where the requirement comes from**
+
+This is 12.4.7 applied to `branch`, which is the only construct in v0 with two descriptions of which one runs. Where the arms' skeletons differ, the node has no determined skeleton, and the origin of the identity of an output Object slot depends on a choice made at run time. Every place downstream that refers to that Object -- a binding on a later node, a `body.returns` entry, the target of a scheduling policy -- then has no determined answer.
+
+It is also stronger than the principle of 1.1. The two arms may agree on how many Objects they consume and create and still have unequal skeletons, if what an output Object's identity comes from is not the same.
+
+**What follows**
 
 ```text
-then arm maps the output slot from one branch argument slot, while else arm maps it from another branch argument slot
-then arm maps the output slot from a branch argument slot, while else arm creates or replaces the output Object
-both arms create same-name, same-type output Objects independently
-arms use different Object-bearing structural transforms for the same common output slot
+both arms correspond from the same argument slot     skeletons agree            valid
+both arms consume and both create                    creation point is the node in
+                                                     each case, so they agree    valid
+one arm corresponds, the other creates               phi and N disagree          error
+the arms correspond from different argument slots    phi disagrees               error
+only one arm has the Object-bearing output           N or phi differs in size    error
+the arms use different correspondence kinds for
+  the same output slot                               the kind disagrees          error
 ```
 
-This restriction is primarily intended to keep Object policy tracking stable. A scheduling policy targeting a branch Object output must not apply to different physical Object identities depending on the selected arm.
+The second row is what the creation point being a node rather than a process definition decides (12.4.3). Where both arms create, the creation point is this `branch` node in both cases: whichever arm runs, one new Object appears at this node's output, so where its identity came from does not depend on the arm and the skeletons are equal.
+
+Where `else` is omitted, the implicit arm's skeleton is the identity correspondence from each Object-bearing entry of `args` to the same-name output (12.4.5, 20.3). The `then` arm must therefore have that same skeleton: an arm that consumes or creates an Object needs an explicit `else` that does the same.
+
+The last row is not reachable in v0. The only correspondence of kind `order_preserving` comes from a transform, both v0 transform kinds change the type of the value, and rule 4 of 20.1 requires a common output to have the same type in both arms, so the type check reports first. It is stated because the set of correspondence kinds is open (12.4.2).
+
+**Who checks it**
+
+Skeleton equality is decided statically and the validator checks it. An execution engine assumes it and needs no run-time check.
+
+**Relation to policies**
+
+Because of this requirement, the target of a scheduling policy does not depend on the selected arm. A policy target follows the skeleton (24.1), and equal skeletons give the same physical Object identities whichever arm runs.
 
 Future versions may introduce an explicit feature for policy transfer semantics across Object replacement or conditional Object provenance. That feature is outside v0. v0 does not infer or perform policy transfer across `consume` / `create`, and branch does not provide conditional policy target semantics.
 
@@ -2605,7 +2627,7 @@ If `outputs` is omitted, default branch output derivation applies only to Object
 
 All Object-bearing outputs of the `then` and `else` arm processes are treated as implicit `common` output candidates.
 
-For each Object-bearing output produced by either arm, both arms must produce an output with the same name, type, and phase, and the corresponding Object slots must be identity-equivalent across arms. If these conditions are satisfied, the branch node exposes that output as a common Object-bearing output. If an Object-bearing output is present in only one arm, if the corresponding outputs have different types or phases, or if the corresponding Object slots are not identity-equivalent across arms, it is a validation error.
+For each Object-bearing output produced by either arm, both arms must produce an output with the same name, type, and phase, and the two arms' skeletons must be equal (20.2). If these conditions are satisfied, the branch node exposes that output as a common Object-bearing output. An Object-bearing output present in only one arm, corresponding outputs with different types or phases, and unequal arm skeletons are each a validation error.
 
 Data outputs are not exposed by default. If `outputs` is omitted, Data outputs produced by branch arms are dropped.
 
@@ -2712,9 +2734,9 @@ do_while:
 branch:
   common output: selected arm output, same name/type/phase in both arms
   Data output with mode common: common Data output from both arms
-  Object-bearing output with mode common: common Object-bearing output from both arms, identity-equivalent across arms
+  Object-bearing output with mode common: common Object-bearing output from both arms, the arms having equal skeletons
   Data output with mode drop: not exposed
-  default: expose all same-name/same-type/same-phase identity-equivalent Object-bearing outputs as common; drop Data outputs
+  default: expose all same-name/same-type/same-phase Object-bearing outputs as common, the arms having equal skeletons; drop Data outputs
   one-sided Object-bearing outputs: invalid
   arm-dependent Object identity for common Object-bearing outputs: invalid
 ```
@@ -3243,8 +3265,8 @@ Implementations may report validation, portability, unsupported-feature, and ext
 35. Zip-equal length mismatches are classified by the earliest phase at which the mismatch is determined.
 36. `fold` and `do_while` expose carry outputs by default and drop non-carry Pure Data outputs by default; in `fold`, non-carry Object-bearing outputs must be explicitly listed with `mode: collect`.
 37. If `do_while` reaches `max_iterations` while its condition output remains `true`, the node terminates by bounded termination; this is not an IR validation error or a v0-defined runtime failure, and outputs are produced from the invocations that actually ran.
-38. `branch` exposes Object-bearing outputs by default only when they are common to both arms with the same name, type, phase, and identity-equivalent Object slot provenance; Data outputs are dropped by default.
-39. A branch common Object-bearing output whose Object identity may depend on the selected arm is invalid in v0.
+38. `branch` exposes Object-bearing outputs by default only when they are common to both arms with the same name, type, and phase, and the two arms have equal Object skeletons (12.4.3); Data outputs are dropped by default.
+39. A branch whose two arms have unequal Object skeletons is invalid in v0: the origin of an output Object's identity would depend on the selected arm. Two arms that both consume and both create are equal, since the creation point is the branch node in each case.
 40. If branch `outputs` is present, it is authoritative and the default branch output derivation does not apply.
 41. `python_script_processes` supports inline `language: python` script processes for Pure Data only; other script languages are not portable v0.
 42. Python script code returns an output-name mapping; `script.returns` is not defined in v0.

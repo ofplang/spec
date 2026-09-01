@@ -69,6 +69,17 @@ specification itself.
   families of two collections by a correspondence kind rather than by position,
   so it never enumerates a collection and never names an index, and equality is
   the comparison of two normal forms.
+- **20.2** a `branch`'s two arms must have equal Object skeletons, replacing the
+  list of four forbidden shapes. **Two arms that both consume and both create
+  are now valid**: the creation point is the branch node in each case, so
+  whichever arm runs, one new Object appears at that node's output and where its
+  identity came from does not depend on the arm. A composite arm can also be
+  judged for the first time, since a skeleton is derived from a body graph as
+  well as from an `objects` section -- previously the comparison read `objects`
+  declarations, which a composite does not have, so a composite arm could never
+  satisfy it.
+- **16** the threading requirement is checked for a composite target process as
+  well as an atomic one, for the same reason.
 - **12.4.7** every process and node has exactly one skeleton. Where a construct
   has several descriptions of which one runs, they must all have equal
   skeletons; `branch` is the only such construct in v0. This is stronger than
@@ -127,6 +138,9 @@ specification itself.
   condition output reads `<node>.exhausted` instead.
 - A port, process, node id, binding, return, type, trait, or type parameter
   named `exhausted` must be renamed.
+- A `branch` whose arms were split into two processes only to satisfy the old
+  identity-equivalence rule can be written directly now, and one that was
+  rejected for having both arms replace the Object is accepted.
 - A use of `array_reverse` has no replacement. Order is observable in v0 only
   through the correspondence between collections, the traversal order of `fold`,
   and the output order of `collect`, so a workflow that depended on reversal must

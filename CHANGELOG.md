@@ -167,23 +167,64 @@ specification itself.
 
 ### Migrating from 0.0
 
-- An output written with `mode: last` becomes a `carry`: the target process
-  threads the value itself and the node exposes the final one. The initial value
-  must now be written, which is the one thing `mode: last` did not require.
+Renames, which are mechanical:
+
+- The process-level marker `elidable_iso` becomes `object_identity_map`, and a
+  process declares it under `behavior` rather than `traits`. The top-level
+  `traits` section, and a type's `implements`, are unchanged. A marker v0 does
+  not define is now an error rather than silently ignored, so a document that
+  keeps the old spelling is rejected rather than read as declaring nothing.
+- A port, process, node id, binding, return, type, trait, or type parameter
+  named `exhausted` must be renamed: the name is reserved (2.4).
+
+Removals, where a document has to be rewritten:
+
+- `mode: last` becomes a `carry`: the target process threads the value itself
+  and the node exposes the final one. The initial value must now be written,
+  which is the one thing `mode: last` did not require.
 - A workflow that told bounded termination apart by reading a `mode: last`
   condition output reads `<node>.exhausted` instead.
-- A port, process, node id, binding, return, type, trait, or type parameter
-  named `exhausted` must be renamed.
-- A `branch` whose arms were split into two processes only to satisfy the old
-  identity-equivalence rule can be written directly now, and one that was
-  rejected for having both arms replace the Object is accepted.
-- A use of `array_reverse` has no replacement. Order is observable in v0 only
-  through the correspondence between collections, the traversal order of `fold`,
-  and the output order of `collect`, so a workflow that depended on reversal must
-  express it in the process that produces the collection.
-- A use of `array_uncons` or `array_cons` that was regrouping is written with
-  `array_unflatten` or `array_flatten`. One that singled out the first element
-  has no replacement, by criterion 3 of 14.4.0.
+- `array_uncons` or `array_cons` used to regroup becomes `array_unflatten` or
+  `array_flatten`. One that singled out the first element has no replacement, by
+  criterion 3 of 14.4.0.
+- `array_reverse` has no replacement. Order is observable in v0 only through the
+  correspondence between collections, the traversal order of `fold`, and the
+  output order of `collect`, so a workflow that depended on reversal must express
+  it in the process that produces the collection.
+
+Requirements a document may not have satisfied before, none of which existed to
+be broken deliberately:
+
+- Every input port of a node's target process is bound exactly once, and every
+  binding entry names an input port (11). The rule was stated for an ordinary
+  node's ports and is now stated for every node kind and in both directions.
+- A `map` node and a `fold` node need at least one `each` source (17, 18).
+- An Object-bearing carry is threaded through its target: the carried input's
+  fate is the same-name output, or that input is consumed and that output
+  created (16).
+- The two ports of an `objects.map` entry must have the same resolved type
+  (14.1). The `object_identity_map` inference pairs on name, type and phase for
+  the same reason (15), so a process whose same-name ports differ in type no
+  longer has a mapping inferred for them.
+- `max_iterations` must be an integer of at least 1 (19).
+- A `branch`'s two arms must have equal Object skeletons (20.2). This accepts
+  more than the rule it replaces -- two arms that both replace the Object are
+  valid, and an arm may be a composite -- and rejects the same arrangements the
+  old list of four prohibitions did.
+
+Two things a 0.0 document could have been written with that no revision made
+invalid: an Object-bearing value referred to twice or not at all inside a
+composite body, and a composite Object output port with no `returns` entry. 13
+forbade both as properties of an incomplete skeleton in 0.0 as it does now. What
+0.1 adds is the operational rule they follow from (12.2), so an implementation
+that checked only 12's degree rules may begin reporting documents it used to
+accept.
+
+Written for 0.1 and read by 0.0: a document declaring `spec_version: "0.1"` is
+refused by an implementation of 0.0 only if that implementation checks the
+declaration, which no released one does (2.1 made it decide nothing until this
+revision). Such an implementation reads the document by 0.0's rules and does not
+say so.
 
 ## 0.0 - 2026-08-19
 

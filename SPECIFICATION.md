@@ -1,10 +1,12 @@
-# Object-flow Programming Language v0 Specification Current Draft
+# Object-flow Programming Language v0 Specification
 
-Status: current working draft  
-Date: 2026-08-16  
-Based on: baseline 2026-07-01, with design resolutions through 2026-08-16, including YAML shape, identifier, type-expression, reference-syntax, import-boundary, contract-expression, static-view-value, generic-instantiation, implementation-extension, scheduling-policy-schema, descriptive-metadata, binding-type-compatibility, rigid-type-parameter, generic-contract-reference, view-field-name, and phase-determined-validation resolutions
+Revision: 0.1  
+Date: 2026-09-01  
+Supersedes: revision 0.0 (2026-08-19), incompatibly. CHANGELOG.md records what changed and what a document written against 0.0 has to do about it.
 
-This document is a self-contained current draft specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
+A document names the revision it is written against with `spec_version` (2.1). This revision removes the `array_uncons`, `array_cons` and `array_reverse` transform kinds and the `last` output mode, renames the `elidable_iso` marker to `object_identity_map` and moves it to a process's `behavior` section, adds the `array_flatten` and `array_unflatten` transform kinds and the `do_while` node's reserved `exhausted` output, and introduces the Object skeleton (12.4), in terms of which Object tracking completeness, the identity-map marker, a transform's correspondence, a branch's two arms, and a scheduling policy's target are now all stated.
+
+This document is a self-contained specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
 v0 uses a **Core + Features** model. The canonical v0 form contains a `features` section listing all features required by the document body. If `features` is omitted, the required features are derived from the document body and the document is interpreted as if the derived feature set had been written explicitly.
 

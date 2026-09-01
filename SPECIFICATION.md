@@ -63,7 +63,7 @@ An operation whose consumed quantity genuinely varies at run time is expressed b
 A v0 document may contain:
 
 ```yaml
-spec_version: "0.0"
+spec_version: "0.1"
 features: []
 traits: {}
 types: {}
@@ -73,25 +73,43 @@ entry: main
 
 ### 2.1 Specification version metadata
 
-A v0 document may declare reserved specification-version metadata using the top-level `spec_version` field.
+A v0 document may declare the revision of this specification it is written against, using the top-level `spec_version` field.
 
 ```yaml
-spec_version: "0.0"
+spec_version: "0.1"
 ```
 
-In v0, `spec_version` is metadata only. It does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling policy handling, or runtime behavior.
-
-`spec_version` is not the workflow author's document version.
-
-If present, the value of `spec_version` must be a string using a two-number version format:
+If present, the value must be a string using a two-number version format:
 
 ```text
 MAJOR.MINOR
 ```
 
-For the current v0 draft, the conventional value is `"0.0"`.
+A malformed `spec_version` value is a validation error. Omission of `spec_version` is allowed, and a document that omits it is read as being written against the revision the implementation implements.
 
-A malformed `spec_version` value is a validation error. Omission of `spec_version` is allowed in v0.
+**What the declaration decides, and what it does not**
+
+`spec_version` does not select how a document is interpreted. There is one set of rules -- the revision the implementation implements -- and every document is read by them. Declaring an earlier revision does not ask for that revision's rules, and no implementation is required to keep more than one set.
+
+What it decides is whether the implementation is willing to answer at all. An implementation implements one revision, and:
+
+```text
+same MAJOR, MINOR <= the implemented MINOR   accepted
+same MAJOR, MINOR >  the implemented MINOR   validation error
+different MAJOR                              validation error
+```
+
+A document declaring a later revision is refused because the implementation cannot know what it was written to mean: the constructs it uses may be ones this revision does not define, and reading it by these rules would answer a question that was not asked. A different MAJOR is a different generation of the language.
+
+An earlier MINOR is accepted rather than refused because a revision within one MAJOR is an edit of the same language, and where such a document uses something the current revision removed, the error naming that construct says more than a version mismatch would. What the acceptance does not promise is that the document is still valid: it is read by the current rules, and CHANGELOG.md records what changed between revisions.
+
+**The current revision**
+
+```text
+0.1
+```
+
+An implementation states the revision it implements. Two implementations of different revisions may therefore disagree about one document, and the declaration is what makes that disagreement legible rather than silent.
 
 ### 2.2 Processing order
 
@@ -402,7 +420,7 @@ a process definition under processes.<name>
 
 At each of these positions, `description` is optional. If present, its value must be a YAML string scalar. UTF-8 text is allowed, including Japanese. A `null`, sequence, mapping, or non-string scalar value is a validation error, consistent with 2.3.
 
-`description` is metadata only. Like `spec_version` (2.1), it does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling policy handling, or runtime behavior. Two documents that differ only in `description` values are semantically identical.
+`description` is metadata only. It does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling policy handling, or runtime behavior. Unlike `spec_version` (2.1), which is checked although it does not select an interpretation, nothing at all is decided by it. Two documents that differ only in `description` values are semantically identical.
 
 v0 does not define `description` on input ports, output ports, type parameters, view fields, nodes, bindings, contracts, scheduling policies, or any mapping position not listed above. The descriptive meaning of a port is expected to be documented in the enclosing process `description`, and the descriptive meaning of a view field in the enclosing type `description`. A `description` key at an undefined position is an unknown-key validation error under 2.3.
 
@@ -625,6 +643,7 @@ Examples of validation errors:
 unknown feature name
 required feature missing from an explicit features section
 malformed spec_version metadata value
+spec_version names a revision the implementation does not implement
 Object-bearing output is unused
 Object-bearing output fans out
 Object-bearing input has no source
@@ -3255,7 +3274,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 ## 27. Summary of v0 Core Rules
 
 1. A process's input and output endpoints are collectively called ports; input ports are declared under `inputs`, and output ports are declared under `outputs`.
-2. A v0 document may include optional reserved `spec_version` metadata. If present, it must use the two-number string format `MAJOR.MINOR`; omission is allowed in v0.
+2. A v0 document may include optional reserved `spec_version` metadata naming the revision it is written against. If present, it must use the two-number string format `MAJOR.MINOR`; omission is allowed. It does not select an interpretation -- a document is read by the rules of the revision the implementation implements -- but an implementation refuses a later MINOR of the same MAJOR, and any other MAJOR, rather than answer for a revision it does not implement (2.1).
 3. Types are nominal; built-in primitive Data types are `Bool`, `Int`, `Float`, and `String`, and the only built-in type constructor is `Array<T>`.
 4. `$import` provides structural inclusion before validation; it is not a module system and introduces no namespace or aliasing. Import paths should be relative for portability; URI-scheme references are implementation extensions, and URI fragments are not defined in v0.
 5. Imported fragments normally omit reserved metadata; duplicate keys at the same expanded mapping level after import resolution are validation errors.

@@ -61,6 +61,14 @@ specification itself.
   while the carry output is created -- was accounted for and yet had no
   expressible Object correspondence for the node, since it would have to name a
   position within a collection.
+- **2.1** `spec_version` is checked. It still does not select an interpretation
+  -- there is one set of rules and every document is read by them -- but an
+  implementation now refuses a document declaring a later MINOR of the same
+  MAJOR, or any other MAJOR, rather than answer for a revision it does not
+  implement. An earlier MINOR is accepted: a revision within one MAJOR is an
+  edit of the same language, and where such a document uses something a later
+  revision removed, the error naming that construct says more than a version
+  mismatch would. The current revision is `0.1`.
 - **14.1** the resolved types of an `objects.map` entry's source and target must
   match. Every comparable rule carried such a condition already -- a transform's
   role typing, the identity-map marker, carry compatibility, a branch's common

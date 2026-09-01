@@ -61,6 +61,22 @@ specification itself.
   while the carry output is created -- was accounted for and yet had no
   expressible Object correspondence for the node, since it would have to name a
   position within a collection.
+- **14.1** the resolved types of an `objects.map` entry's source and target must
+  match. Every comparable rule carried such a condition already -- a transform's
+  role typing, the identity-map marker, carry compatibility, a branch's common
+  outputs, binding type compatibility -- and this was the one place without one,
+  so `outputs.plate: inputs.cup` between unrelated Object types was accepted and
+  the claim to preserve container structure was made between slot structures
+  that do not correspond.
+- **19** `max_iterations` must be at least 1. A bound of zero contradicts the
+  at-least-once invocation the section opens with.
+- **12.2** the degree rule for an Object-bearing value read as a *source* of a
+  composite body, which 13 forbade breaking as a property while 12 never stated
+  it operationally. A composite's own input port needed it most: the rule above
+  it governs an output port, and a composite input port read as a source is not
+  one.
+- **19.1** rule 2 takes precedence where the condition output is also a carry
+  binding, which rules 2 and 5 disagreed about.
 - **12.4 Object skeleton.** A process's skeleton is a partial injection from its
   input Object slots to its output Object slots, the input slots it consumes,
   and the output slots it creates, each created slot carrying the node at which

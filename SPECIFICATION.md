@@ -660,6 +660,8 @@ transform path participates in multiple incompatible Object fates or provenances
 node carries a section that is not valid for its node kind
 process declares a behavior marker v0 does not define
 process Object skeleton is not complete
+objects.map source and target port types do not match
+do_while max_iterations is less than 1
 map or fold node has no each source
 Object-bearing carry is neither preserved nor replaced by the target process
 node binding names no input port of the target process
@@ -1640,6 +1642,15 @@ An Object-bearing output port must be connected either to:
 
 If an Object-bearing output port is not connected, it is a validation error.
 
+Read from the other end, within a composite body every Object-bearing value is referred to exactly once. The values a body has are the composite's own input ports, the output ports of each ordinary node, and the outputs a structured node exposes (21.0). A reference is a `from` in any binding section of any node, or a `from` in a `body.returns` entry.
+
+```text
+referred to twice or more   duplication
+referred to zero times      an Object with no fate
+```
+
+Both are validation errors. 13 forbids them already, as properties an incomplete Object skeleton has; this states the degree rule they follow from, so that the rule can be applied to a value directly. The composite's own input ports need it most: 12.2 above governs an *output* port, and a composite input port read as a source of the body is not one.
+
 ### 12.3 Composite returns
 
 `body.returns` is a connection from an internal graph output port to the composite boundary.
@@ -1754,7 +1765,7 @@ A process that omits `objects` entirely and declares `object_identity_map` has t
 
 #### 12.4.5 Composition of skeletons
 
-A composite's skeleton is composed along its body. Every Object-bearing value in a body is referred to exactly once (11, 12.2), so each Object slot has one path through the body and the composition is determined.
+A composite's skeleton is composed along its body. Every Object-bearing value in a body is referred to exactly once (12.2), so each Object slot has one path through the body and the composition is determined.
 
 **Non-structured node.** The target process's skeleton, placed at this node.
 
@@ -1935,6 +1946,25 @@ objects:
 ```
 
 For atomic processes, `objects.map` is a declarative Object behavior claim made by the process definition.
+
+The resolved types of the target path and the source path of each `objects.map` entry must match. A mapping between ports of different types is a validation error. Matching is the structural relation of 11.1, which reduces to identity of type expressions where no type parameter is involved.
+
+```yaml
+# valid
+objects:
+  map:
+    outputs.cup: inputs.cup          # Cup and Cup
+    outputs.cups: inputs.cups        # Array<Cup> and Array<Cup>
+    outputs.a: inputs.b              # cross-wired, and both are Cup
+
+# validation error
+objects:
+  map:
+    outputs.plate: inputs.cup        # Plate96 and Cup
+    outputs.cup: inputs.cups         # Cup and Array<Cup>
+```
+
+The requirement is what gives the container-structure claim below its meaning. `object_slots` has the same structure on both sides only where the types match, so a claim to preserve length, nesting, and order says nothing at all between ports whose slot structures differ. Every comparable rule already carries such a condition -- a transform's role typing (14.4.1), the `object_identity_map` marker (15), carry compatibility (16), a branch's common outputs (20), and binding type compatibility (11.1) -- and `objects.map` was the one place without one.
 
 For Object-bearing container values, a `map` from `inputs.xs` to `outputs.ys` is interpreted recursively over Object slots. The IR processor treats the source and target value structures as corresponding identity-preservingly. For `Array<T>`, this declared behavior preserves top-level length, nesting structure, element order, and contained Object identities at corresponding slots. Processes that declare Object-bearing container structure changes, such as changing order, length, grouping, or nesting, must use an explicit `objects.transform` rather than `map`.
 
@@ -2407,7 +2437,9 @@ Requirements:
 2. Each `carry` binding has a same-name, same-type, same-phase output on the target process, and an Object-bearing carry satisfies the threading requirement of section 16.
 3. Object-bearing outputs of the target process must be carry outputs. Non-carry Object-bearing outputs are forbidden in `do_while`.
 4. `condition.output` names a Boolean Data output of the target process.
-5. `max_iterations` is required and must be a graph/run phase integer.
+5. `max_iterations` is required, must be a graph/run phase integer, and must be greater than or equal to 1. A value of zero or a negative value is a validation error. This follows from do-while semantics: the target process is invoked at least once, and a bound of zero would contradict that guarantee.
+
+   Where `max_iterations` is given as a `value` literal, the condition is decided at graph phase. Where it is given by `from` from a graph or run phase port, it is decided at the earliest phase at which the value is determined, as a validation error or a preflight error (6.2).
 6. Non-carry Data outputs may be exposed only using explicit output modes.
 
 `do_while` has no `each` section and requires no `carry` binding. Its iteration count comes from the condition output and `max_iterations` rather than from a traversal length, which is why the requirement `map` and `fold` carry -- at least one `each` source -- has no counterpart here. A `do_while` with no carry binding is meaningful: its target is a physical operation, and the condition output it returns may differ between invocations even though the node binds the same values each time.
@@ -2436,7 +2468,7 @@ Rules:
 2. When `outputs` is present, every carry binding must be listed with `mode: carry`.
 3. `mode: collect` may be used only for non-carry Data outputs of the target process.
 4. `mode: drop` may be used only for non-carry Data outputs.
-5. The condition output is an ordinary Boolean Data output of the target process and may be exposed using `collect` or `drop`.
+5. The condition output is an ordinary Boolean Data output of the target process and may be exposed using `collect` or `drop`. Where the condition output is also a carry binding, rule 2 takes precedence and it is exposed with `mode: carry`: the value threaded across iterations is what the node exposes, and the final one is the value the condition was last read from.
 6. Non-carry Object-bearing outputs remain forbidden in `do_while`.
 7. Collected Data outputs are ordered by invocation order.
 8. The condition output includes the final `false` value when the loop exits normally because the condition became false, if the condition output is collected.
@@ -3236,7 +3268,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 12. `features` is canonical when present and must include all required features; if omitted, required features are derived from the body.
 13. Unknown non-extension feature names are validation errors.
 14. Object-bearing values are determined by recursive `object_slots`; Object identity belongs to Object slots, not to the enclosing Object-bearing value as a whole.
-15. Object-bearing values are linear: no fan-out, no implicit discard of contained Object slots.
+15. Object-bearing values are linear: no fan-out, no implicit discard of contained Object slots. Within a composite body, every Object-bearing value -- a composite input port, an ordinary node's output port, or an output a structured node exposes -- is referred to exactly once (12.2).
 16. Object-bearing values are normally `data` phase; rare `run` phase is allowed; `graph` phase is invalid.
 17. Ordinary node invocations use `state` for Object-bearing linear inputs and `bind` for Pure Data inputs.
 18. In `fold` and `do_while`, `carry` is loop-carried and may be Pure Data or Object-bearing.
@@ -3250,7 +3282,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 21a. A process's Object skeleton is the triple of a partial injection from its input Object slots to its output Object slots, the input slots it consumes, and the output slots it creates, each created slot carrying the node at which it is created. Object tracking completeness is completeness of that skeleton (12.4.6), and every process and node must have exactly one (12.4.7).
 22. All processes must satisfy Object tracking completeness.
 23. Every Object slot must have exactly one fate or provenance.
-24. `map` preserves physical identity.
+24. `map` preserves physical identity, and the resolved types of an entry's source and target must match (14.1).
 25. `consume` ends an input Object identity.
 26. `create` introduces a new Object identity.
 27. `consume + create` is Object replacement; policy and `.view` metadata do not automatically transfer across replacement.

@@ -401,7 +401,7 @@ A source entry containing both `from` and `value`, or neither, is a validation e
 
 `do_while.condition.output` is an output name of the target process, not a body dataflow reference. The named target process output must exist and must be a Boolean Data output. It is evaluated after each invocation of the target process. The `do_while` node repeats while this output value is `true` and exits when it is `false`, subject to `max_iterations`.
 
-The condition output is an ordinary non-carry Data output for output-mode purposes. It may be exposed using `collect` or `drop` when explicit `do_while.outputs` are present. If `do_while.outputs` is omitted, the condition output is dropped by default.
+The condition output is an ordinary Data output of the target process, and how the node exposes it follows the output-mode rules of 19.1. It may be exposed using `collect` or `drop`, and where it is also a carry binding it is exposed with `mode: carry` (19.1 rule 5). If `do_while.outputs` is omitted and the condition output is not a carry binding, it is dropped by default.
 
 Reference parsing and reference resolution are separate validation steps. A malformed reference is a validation error. A syntactically valid reference whose target does not exist is an unknown reference validation error. A reference that is not valid in its syntactic context is an invalid reference scope validation error. A reference whose resolved type or phase does not satisfy the target requirement is a type or phase validation error.
 
@@ -2230,7 +2230,11 @@ processes:
       - object_identity_map
 ```
 
-For atomic processes, if `objects` is completely omitted and the process declares `object_identity_map`, v0 may infer same-name mappings for top-level Object-bearing inputs and outputs.
+For atomic processes, if `objects` is completely omitted and the process declares `object_identity_map`, v0 infers, for every Object-bearing input port of that process, a `map` to the Object-bearing output port of the same name, type, and phase.
+
+A port whose type is an `Array` is included. The inferred `map` is interpreted recursively over Object slots as 14.1 defines, so Array length, nesting structure, element order, and contained Object identities are preserved.
+
+Where an Object-bearing input port has no output port of the same name, type, and phase, the inference produces nothing for it, and the resulting `objects` behavior does not satisfy Object tracking completeness (13): the port has no fate, which is a validation error. The same holds for an Object-bearing output port with no corresponding input port. The marker asserts an identity map, and a port it cannot be asserted of is a port the marker does not explain.
 
 Canonical inferred form:
 
@@ -2405,6 +2409,16 @@ Rules:
 
 An empty `each` traversal is not an error. The node performs zero element-wise invocations, `mode: collect` outputs are empty Arrays -- including an Object-bearing collect output, which then contains zero Object slots -- and `mode: carry` outputs expose the initial carry value unchanged. No fold output mode requires an invocation to have happened.
 
+**Non-normative.**
+
+Where a `fold` carry transition replaces the Object by `consume` + `create` (16) and the `each` length turns out to be zero, the target process is not invoked, so the carry output is the same Object as the carry input: nothing is consumed and nothing is created. The node's Object skeleton (12.4.5) describes the transition as a replacement whatever the traversal length is, and is therefore an over-approximation of what happens in that case.
+
+The over-approximation is sound. The number of Objects is unchanged either way, and a consumption paired with a creation duplicates nothing and loses nothing, so neither linearity nor completeness can be broken by the difference. Skeleton equality is unaffected too, since the skeleton does not depend on the traversal length.
+
+It is also conservative in the direction that matters. A scheduling policy on the carried Object is treated as having ended at the node (24.1), so it stops earlier than it strictly needed to, rather than being applied to an Object it was not meant for.
+
+`do_while` is not affected: it invokes its target at least once (19), so its traversal length is never zero.
+
 If `outputs` is omitted:
 
 ```text
@@ -2506,7 +2520,7 @@ If `outputs` is omitted:
 
 ```text
 carry outputs are exposed as carry
-non-carry Data outputs are dropped, including the condition output
+non-carry Data outputs are dropped, including the condition output where it is not a carry binding
 non-carry Object-bearing outputs are forbidden
 ```
 
@@ -2777,7 +2791,8 @@ do_while:
   carry output: final carry value, same name as carry binding
   Data output with mode collect: Array of per-iteration values
   Data output with mode drop: not exposed
-  condition output: ordinary Boolean Data output; may use collect or drop
+  condition output: ordinary Boolean Data output; may use collect or drop, or carry
+    where it is also a carry binding (19.1 rule 5)
   exhausted: reserved Bool output; always exposed; never listed in outputs
   default: expose carry outputs only; drop non-carry Data outputs including condition
   Object-bearing outputs: carry outputs only
@@ -3296,6 +3311,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 19a. The binding entries of a node and the input ports of the process it invokes are in one-to-one correspondence: every input port is bound exactly once across the binding sections valid for the node kind, and every binding entry names an input port. v0 defines no default value for an input port.
 19b. A `map` node and a `fold` node must each have at least one `each` source; their traversal length is otherwise undetermined. `do_while` has no such requirement.
 19c. For an Object-bearing carry, the target process either has the carried input port's fate be the same-name output port, or consumes that input port and creates that output port. No other arrangement is valid.
+19d. `do_while` requires `max_iterations`, a graph or run phase integer of at least 1. A bound of zero or a negative value contradicts the guarantee that the target process is invoked at least once, and is a validation error.
 20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths.
 21. Composite Object behavior is derived from body graph flow and `returns`, as the composition of the body's node skeletons (12.4.5).
 21a. A process's Object skeleton is the triple of a partial injection from its input Object slots to its output Object slots, the input slots it consumes, and the output slots it creates, each created slot carrying the node at which it is created. Object tracking completeness is completeness of that skeleton (12.4.6), and every process and node must have exactly one (12.4.7).

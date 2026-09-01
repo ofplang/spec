@@ -61,6 +61,14 @@ specification itself.
   while the carry output is created -- was accounted for and yet had no
   expressible Object correspondence for the node, since it would have to name a
   position within a collection.
+- **15** the inference the marker permits is stated directly instead of being
+  qualified as applying to "top-level" ports, which read two ways. It applies to
+  every Object-bearing input port, an `Array` port included, and pairs with the
+  output port of the same name, **type, and phase**; a port with no such
+  counterpart is left unexplained, which is an incompleteness error. The
+  matching of types was implied by the definition above it and missing from the
+  inference rule, so an inferred map could relate ports that an explicitly
+  written one may not (14.1).
 - **2.1** `spec_version` is checked. It still does not select an interpretation
   -- there is one set of rules and every document is read by them -- but an
   implementation now refuses a document declaring a later MINOR of the same
@@ -128,6 +136,10 @@ specification itself.
   resources a workflow needs before it runs.
 
 ### Changed
+
+- **2.6.7** no longer calls the `do_while` condition output a non-carry output,
+  which contradicted 19.1 rule 5; how the node exposes it is 19.1's to say.
+
 
 - **15** the process-level marker `elidable_iso` is renamed
   `object_identity_map`, and the section it is declared in moves from a

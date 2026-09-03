@@ -6,7 +6,12 @@ This document accompanies `SPECIFICATION.md`. It defines a core calculus `ofp-co
 desugaring from v0 documents into it, a typing discipline that computes Object skeletons,
 an operational semantics, and the results proved about them.
 
-Section references of the form "spec N" point to `SPECIFICATION.md`.
+Section references of the form "spec N" point to `SPECIFICATION.md`, **revision 0.2**. A
+reference names what that revision numbers it; where a later revision renumbers or changes
+what a reference names, this document is behind it until it is updated.
+
+**This document is not normative.** Where it and `SPECIFICATION.md` disagree, the
+specification is right and the disagreement is a defect here.
 
 ---
 
@@ -1429,12 +1434,14 @@ The proofs are case analyses, so they are only as good as the enumeration behind
 ```
 enumerated   the summary rules of spec 27, each classified
              every occurrence of "validation error", by section
-read in full spec 2, 5, 7, 8, 11, 12, 13, 14, 16-22, 24-27
+read in full spec 2, 5, 7, 8, 10, 11, 12, 13, 14, 16-22, 24-27
 scanned      spec 3 (imports), 9 (contracts), 23 (scheduling), the view half of spec 7
 ```
 
 The four sections that were only scanned are class B or class C and do not reach the typing
-rules. **Every section that can bear on class A was read in full.**
+rules. **Every section that can bear on class A was read in full.** Spec 10 is in the list
+because it carries one condition of each kind: the acyclicity of both dependency graphs
+(10.2, rule 21b), which is class A, and the entry process (10.3), which is class B.
 
 Reading in full rather than searching for the phrase "validation error" matters: spec 5.3
 states that an `each` source collection must not also be connected elsewhere or returned, and

@@ -1,10 +1,12 @@
 # Object-flow Programming Language v0 Specification
 
-Revision: 0.1  
-Date: 2026-09-01  
-Supersedes: revision 0.0 (2026-08-19), incompatibly. CHANGELOG.md records what changed and what a document written against 0.0 has to do about it.
+Revision: 0.2 (draft)  
+Date: unreleased  
+Supersedes: revision 0.1 (2026-09-01). CHANGELOG.md records what changed and what a document written against 0.1 has to do about it. A 0.1 document stays valid unless it had two nodes of one body with the same `id`, or a body whose nodes referred to each other in a cycle; neither was meaningful, and neither was forbidden by anything 0.1 said.
 
-A document names the revision it is written against with `spec_version` (2.1). This revision removes the `array_uncons`, `array_cons` and `array_reverse` transform kinds and the `last` output mode, renames the `elidable_iso` marker to `object_identity_map` and moves it to a process's `behavior` section, adds the `array_flatten` and `array_unflatten` transform kinds and the `do_while` node's reserved `exhausted` output, and introduces the Object skeleton (12.4), in terms of which Object tracking completeness, the identity-map marker, a transform's correspondence, a branch's two arms, and a scheduling policy's target are now all stated.
+A document names the revision it is written against with `spec_version` (2.1). This revision states four conditions that 0.1 relied on without stating: node ids are unique within a body, a body's node dependency graph is acyclic, a value flows only into an equal-or-later phase, and a literal is a `graph` phase value. It also names the kind of position `max_iterations` occupies, a constant slot (11.2).
+
+Revision 0.1 removed the `array_uncons`, `array_cons` and `array_reverse` transform kinds and the `last` output mode, renamed the `elidable_iso` marker to `object_identity_map` and moved it to a process's `behavior` section, added the `array_flatten` and `array_unflatten` transform kinds and the `do_while` node's reserved `exhausted` output, and introduced the Object skeleton (12.4), in terms of which Object tracking completeness, the identity-map marker, a transform's correspondence, a branch's two arms, and a scheduling policy's target are all stated.
 
 This document is a self-contained specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
@@ -65,7 +67,7 @@ An operation whose consumed quantity genuinely varies at run time is expressed b
 A v0 document may contain:
 
 ```yaml
-spec_version: "0.1"
+spec_version: "0.2"
 features: []
 traits: {}
 types: {}
@@ -78,7 +80,7 @@ entry: main
 A v0 document may declare the revision of this specification it is written against, using the top-level `spec_version` field.
 
 ```yaml
-spec_version: "0.1"
+spec_version: "0.2"
 ```
 
 If present, the value must be a string using a two-number version format:
@@ -108,7 +110,7 @@ An earlier MINOR is accepted rather than refused because a revision within one M
 **The current revision**
 
 ```text
-0.1
+0.2
 ```
 
 An implementation states the revision it implements. Two implementations of different revisions may therefore disagree about one document, and the declaration is what makes that disagreement legible rather than silent.

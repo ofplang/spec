@@ -182,6 +182,8 @@ The built-in names `Bool`, `Int`, `Float`, `String`, `Array`, and `Numeric` are 
 
 Input port names and output port names are separate namespaces. Therefore, an input port and an output port of the same process may have the same name. Duplicate names within `inputs` are validation errors. Duplicate names within `outputs` are validation errors.
 
+Within one composite body, node ids are unique. Two nodes with the same `id` are a validation error, since `<node_id>.<output>` would then not name one value.
+
 The key `$import` is the only `$`-prefixed reserved key defined by v0. Any other `$`-prefixed key is a validation error in portable v0.
 
 The following names are reserved and must not be used as process names, port names, node ids, binding names, return names, type names, trait names, or type parameter names:
@@ -404,6 +406,10 @@ A source entry containing both `from` and `value`, or neither, is a validation e
 `do_while.condition.output` is an output name of the target process, not a body dataflow reference. The named target process output must exist and must be a Boolean Data output. It is evaluated after each invocation of the target process. The `do_while` node repeats while this output value is `true` and exits when it is `false`, subject to `max_iterations`.
 
 The condition output is an ordinary Data output of the target process, and how the node exposes it follows the output-mode rules of 19.1. It may be exposed using `collect` or `drop`, and where it is also a carry binding it is exposed with `mode: carry` (19.1 rule 5). If `do_while.outputs` is omitted and the condition output is not a carry binding, it is dropped by default.
+
+#### 2.6.8 Reference resolution
+
+This applies to every reference form of 2.6, not only to the preceding one.
 
 Reference parsing and reference resolution are separate validation steps. A malformed reference is a validation error. A syntactically valid reference whose target does not exist is an unknown reference validation error. A reference that is not valid in its syntactic context is an invalid reference scope validation error. A reference whose resolved type or phase does not satisfy the target requirement is a type or phase validation error.
 
@@ -671,6 +677,9 @@ fold or do_while carry output is missing
 branch arm has one-sided Object-bearing output
 branch arms have unequal Object skeletons
 Object-bearing value has graph phase
+value phase is later than the port it fills
+duplicate node id within a composite body
+cycle in a composite body's node dependency graph
 Object slot has multiple incompatible fates
 Object slot has multiple incompatible provenances
 unknown v0 transform kind
@@ -1476,6 +1485,8 @@ Composite processes do not have an `objects` section in v0. Their Object behavio
 
 The process dependency graph must be acyclic. Recursive composite dependencies are not allowed in v0.
 
+Within a composite body, the node dependency graph must likewise be acyclic. It has an edge from one node to another where a `from` in a binding or control section (21.0) of the second names an output of the first. This is a separate requirement: the process dependency graph concerns which process invokes which, and the node dependency graph concerns the order of nodes within one body. A cycle in either is a validation error.
+
 ### 10.3 Entry process
 
 `entry` names the entry process. If `entry` is omitted and a process named `main` exists, `main` may be used as the entry. If `entry` is omitted and no process named `main` exists, the document has no entry process and this is a validation error.
@@ -1616,6 +1627,8 @@ Array<T> the YAML value must be a sequence whose every element conforms to T.
 ```
 
 The acceptance of an integer literal for a `Float` port is the same latitude 7.4 gives a static `Float` view value, and for the same reason: YAML integer, floating-point, and exponent forms all denote a number, and a document should not have to write `3.0` where `3` is meant. It is not a subtyping rule and does not extend to `from` bindings, where an `Int`-typed value does not match a `Float` port.
+
+A literal is a `graph` phase value. `graph` is the least phase (6), so a literal satisfies the phase requirement of every Pure Data position it may be written in, and no phase condition is ever stated for a literal.
 
 A literal is Pure Data. A literal bound to an Object-bearing port is a validation error, since a literal cannot introduce an Object identity (13).
 
@@ -2760,7 +2773,7 @@ common    branch                  T, the same type in both arms (20.1)
 drop      any                     not exposed; not a body-visible value
 ```
 
-`map` output types follow the shape rule of 17, so a target output that is already an Array becomes a nested Array. Because `mode: drop` is restricted to Pure Data outputs (18.1, 19.1), an Object-bearing output is only ever exposed as `carry`, `collect`, or `common`.
+`map` output types follow the shape rule of 17, so a target output that is already an Array becomes a nested Array. Because `mode: drop` is restricted to Pure Data outputs (18.1, 19.1, 20.1), an Object-bearing output is only ever exposed as `carry`, `collect`, or `common`.
 
 A `do_while` node also exposes the reserved Boolean output `exhausted` (19.3), which is not shaped by a mode and is never listed in `outputs`.
 
@@ -3300,12 +3313,14 @@ Implementations may report validation, portability, unsupported-feature, and ext
 8. `null` values are not valid in v0 portable YAML.
 9. Omitted `traits`, `types`, `inputs`, and `outputs` are interpreted as empty mappings; `features` may be omitted and derived; `processes` is required.
 10. v0 identifiers are case-sensitive ASCII identifiers matching `[A-Za-z_][A-Za-z0-9_]*`; `.` is not allowed in identifiers, including process names.
+10a. Within one composite body, node ids are unique. Two nodes with the same `id` are a validation error, since `<node_id>.<output>` would then not name one value.
 11. UTF-8 text is allowed in YAML string values and comments, but not in identifiers.
 12. `features` is canonical when present and must include all required features; if omitted, required features are derived from the body.
 13. Unknown non-extension feature names are validation errors.
 14. Object-bearing values are determined by recursive `object_slots`; Object identity belongs to Object slots, not to the enclosing Object-bearing value as a whole.
 15. Object-bearing values are linear: no fan-out, no implicit discard of contained Object slots. Within a composite body, every Object-bearing value -- a composite input port, an ordinary node's output port, or an output a structured node exposes -- is referred to exactly once (12.2).
 16. Object-bearing values are normally `data` phase; rare `run` phase is allowed; `graph` phase is invalid.
+16a. A value may flow from an earlier phase to a later phase but not the reverse; the order is `graph < run < data`. A binding whose value has a phase later than the port it fills is a validation error.
 17. Ordinary node invocations use `state` for Object-bearing linear inputs and `bind` for Pure Data inputs.
 18. In `fold` and `do_while`, `carry` is loop-carried and may be Pure Data or Object-bearing.
 19. `branch` uses `args`, not `state`; Object-bearing branch arguments are supplied only to the selected arm. For a `branch`, the correspondence of rule 19a holds against each arm separately.
@@ -3317,6 +3332,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths.
 21. Composite Object behavior is derived from body graph flow and `returns`, as the composition of the body's node skeletons (12.4.5).
 21a. A process's Object skeleton is the triple of a partial injection from its input Object slots to its output Object slots, the input slots it consumes, and the output slots it creates, each created slot carrying the node at which it is created. Object tracking completeness is completeness of that skeleton (12.4.6), and every process and node must have exactly one (12.4.7).
+21b. Two dependency graphs must be acyclic, and they are different graphs. The process dependency graph is acyclic: a composite must not depend on itself, directly or through others (10.2). Within one composite body, the node dependency graph must also be acyclic; it has an edge from one node to another where a `from` in a binding or control section (21.0) of the second names an output of the first. A cycle in either is a validation error.
 22. All processes must satisfy Object tracking completeness.
 23. Every Object slot must have exactly one fate or provenance.
 24. `map` preserves physical identity, and the resolved types of an entry's source and target must match (14.1).
@@ -3384,6 +3400,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 85. A v0 document may include optional human-readable `description` metadata at the document root and at trait, type, and process definitions. `description` must be a YAML string scalar, is not a reserved identifier name, and does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling, or runtime behavior.
 86. The resolved type of a bound value must match the resolved type of the port it is bound to, in every binding section and in `body.returns`. Matching is the structural matching relation of generic instantiation, which reduces to identity of type expressions when no type parameter is involved. An `each` source must be an Array, and it is its element type that is matched against the target input port.
 87. A literal binding source (`value`) must conform to its port's declared type, checked exactly as a static view value is checked against a view field type; an integer literal is accepted for a `Float` port. A literal must not be bound to an Object-bearing port.
+87a. A literal is a `graph` phase value, the least phase, so it satisfies the phase requirement of every Pure Data position it may be written in.
 88. Structural matching distinguishes a flexible type parameter (declared by the target process, determined by instantiation) from a rigid one (declared by the enclosing process, already fixed). A flexible parameter may be inferred to be a rigid parameter of matching domain; a rigid parameter matches only itself and never a concrete type. A `where` constraint whose parameter was inferred to a rigid parameter is satisfied only if the enclosing process declares that same constraint over it.
 89. A contract view reference through a port whose declared type is a type parameter is not resolved against a view schema at the process definition, since the type argument is chosen at each instantiation; the grammar, reference scope, named ports, and other operands of the expression are still validated there. The parameter's domain is known at the definition: a bare `.view` on an `object`-domain parameter is a validation error, and on a `data`-domain parameter it is not.
 90. Such a reference is instead resolved at each invocation that instantiates the process, by substituting that invocation's inferred type arguments into the target's port types and checking the expression against the resolved types. An invocation resolves only the type arguments it infers itself: where a type argument is a type parameter of the enclosing process, or where inference determined none, the contract is not checked at that invocation. A `where` constraint does not make a view field decidable, because a trait declares no field.

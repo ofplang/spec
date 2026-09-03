@@ -187,9 +187,9 @@ For that reason the adequacy lemmas carry "and `D(doc)` is defined" in their sta
 Class A, keyed to the summary rules of spec 27 where one applies.
 
 ```
-1, 3, 14, 16, 59, 61, 62         types, phases, Object-bearing-ness
+1, 3, 14, 16, 16a, 59, 61, 62    types, phases, Object-bearing-ness
 15                               linearity; every Object-bearing value referred to once
-18, 19, 21, 21a, 22, 23          bindings, skeleton, tracking completeness
+18, 19, 21, 21a, 21b, 22, 23     bindings, acyclicity, skeleton, tracking completeness
 18a, 19a, 19b, 19c, 19d          valid sections, binding coverage, each>=1,
                                  carry threading, max_iterations >= 1
 20, 24, 25, 26, 27, 28           the objects section and the transform kinds
@@ -198,21 +198,21 @@ Class A, keyed to the summary rules of spec 27 where one applies.
 39, 40                           branch skeleton equality
 63-67, 88                        generics, rigid and flexible parameters
 68, 69, 72, 73                   references
-86, 87                           binding type match, literals
-spec 10.2, 12.1, 12.2, 12.4      acyclicity, degrees, skeleton
+86, 87, 87a                      binding type match, literals
+spec 12.1, 12.2, 12.4            degrees, skeleton
 ```
 
 Class B.
 
 ```
-2, 4, 5, 6, 8, 9, 10, 11, 60     document shape, imports, identifiers, type syntax
+2, 4, 5, 6, 8, 9, 10, 10a, 11, 60  document shape, imports, identifiers, type syntax
 12, 13                           features
 17                               state is Object-bearing, bind is Pure Data
 41, 42                           script processes
 77, 78                           import resolution
 85                               description
 spec 2.3                         each node kind fixes its valid sections
-spec 2.4                         reserved names; no duplicate port names
+spec 2.4                         reserved names; no duplicate port names; unique node ids
 spec 10.3                        entry
 spec 22                          script outputs are phase: data
 ```
@@ -220,15 +220,15 @@ spec 22                          script outputs are phase: data
 Class C.
 
 ```
-7, 35, 43, 44-49, 50-58, 70, 71, 74, 75, 79-84, 89-91
+7, 35, 43, 44-48, 50-58, 70, 71, 74, 75, 79-84, 89-91
 ```
 
-Three of the summary rules state no validity condition and fall outside the classification.
+Four of the summary rules state no validity condition and fall outside the classification.
 Rule 37 describes what a `do_while` produces under bounded termination, which section 10
-models as an evaluation rule rather than as a check. Rule 76 is advice on where to draw an
-Object type boundary. Rule 92 qualifies the other rules rather than adding one: an obligation
-classified by phase holds only where the implementation determines the condition at that
-phase.
+models as an evaluation rule rather than as a check. Rule 49 places runtime failure and
+exception handling outside v0. Rule 76 is advice on where to draw an Object type boundary.
+Rule 92 qualifies the other rules rather than adding one: an obligation classified by phase
+holds only where the implementation determines the condition at that phase.
 
 ### 2.3 Class C splits in two
 
@@ -388,12 +388,13 @@ A composite entry is well formed when its body types; its skeleton is read off t
 derivation. **That a composite's skeleton is derived rather than declared is the content of
 functoriality**, and is why composites are not inlined away.
 
-A program is `(Sigma, entry)` with every entry well formed, an acyclic dependency graph
-(spec 10.2), and `entry` a composite.
+A program is `(Sigma, entry)` with every entry well formed, an acyclic *process* dependency
+graph (spec 10.2, rule 21b), and `entry` a composite. The node dependency graph of each body
+is acyclic as well (spec 10.2, rule 21b); that is what `D4` relies on (8.6).
 
 ### 4.5 Phase conditions
 
-Phase appears in exactly five places. None is omitted from a rule.
+Phase *order* appears in exactly five places. None is omitted from a rule.
 
 ```
 1. ARG-VAR (7.1)            pi(variable) <= pi(port)
@@ -403,11 +404,20 @@ Phase appears in exactly five places. None is omitted from a rule.
 5. context well-formedness  Object-bearing implies pi /= graph (spec 6.1)
 ```
 
-A literal is at `graph`, the least phase, so `ARG-LIT` carries no phase condition.
+A literal is at `graph`, the least phase (spec 11.1.1), so `ARG-LIT` carries no phase condition.
 
 Item 4 is written `Gamma |- k <= Int @ run` because `pi' <= run` iff `pi' in {graph, run}`.
 Writing it that way puts it under the argument judgement, where weakening and strengthening
 (Lemma A, 14.1) apply uniformly.
+
+Phase also appears as an **equality** in three places, where two ports must agree. These use no
+order, so Lemma A does not apply to them.
+
+```
+6. LET-FOLD (7.6), LET-DOWHILE (7.7)  carry compatibility: same type and phase   spec 16
+7. valid mode assignment (6.3)        m(p) = common: same type and phase         spec 20.1 rules 2-4
+8. implicit else arm (8.5)            arm outputs of the same names, types, and phases   spec 20
+```
 
 ---
 
@@ -599,7 +609,8 @@ ModeS(m, sigma), per output port p:
   m(p) = drop     ->  requires pure(tau_p); absent from the skeleton
 ```
 
-The side condition on `drop` is spec 18.1 rule 6 and spec 19.1 rule 4 made structural. Without
+The side condition on `drop` is spec 18.1 rule 6, spec 19.1 rule 4, and spec 20.1 rule 6 made
+structural. Without
 it, an Object-bearing port could leave the skeleton and completeness would fail (Lemma S6).
 
 ```
@@ -704,6 +715,9 @@ Gamma |- x <= tau @ pi
 --------------------------------  ARG-LIT
 Gamma |- v <= tau @ pi
 ```
+
+`ARG-LIT` carries no phase condition because a literal is a `graph` phase value, the least
+phase (spec 11.1.1, rule 87a).
 
 ### 7.2 Literals
 
@@ -909,6 +923,10 @@ D : a valid v0 document  ->  an ofp-core program (Sigma, entry)
 D = D5 . D4 . D3 . D2 . D1 . D0
 ```
 
+`Sigma` is the document's processes read as signatures (4.4). `entry` is the document's `entry`
+value, or the process named `main` where `entry` is omitted (spec 10.3). No stage transforms
+either; the stages transform the process definitions that `Sigma` is read from.
+
 **The order is prescribed.** The stages do not commute:
 
 ```
@@ -1039,9 +1057,10 @@ rule 15, 20.1 rule 1), so `m` is total.
 
 ### 8.6 D4: linearize the body
 
-Dependency: `l1 -> l2` when a binding of `l2` has a `from` of the form `l1.p`. An `inputs.p`
-reference creates no dependency; `scheduling` is gone, so temporal references create none
-either. The graph is acyclic.
+Dependency: `l1 -> l2` when a `from` in a binding or control section (spec 21.0) of `l2` has
+the form `l1.p`. Both `branch.condition` and `do_while.max_iterations` are control sections
+that may carry a `from`. An `inputs.p` reference creates no dependency; `scheduling` is gone,
+so temporal references create none either. The graph is acyclic (spec 10.2, rule 21b).
 
 Choose a topological order and emit the let sequence.
 
@@ -1349,9 +1368,12 @@ D0   spec 3
 D1   spec 2.1, 2.3, 4.1, 2.7
 D2   spec 8; termination is Lemma 6
 D3   spec 15, 20, 18.3, 19.2, 20.3
-D4   spec 2.4, 10, 12, 21.0, 22
+D4   spec 2.4, 10.2, 12, 21.0, 22, rule 21b
 D5   spec 12.3
 ```
+
+One class B condition is not required by a stage: `spec 10.3`, the entry process. It is
+resolved when the program `(Sigma, entry)` is formed rather than by a stage (8).
 
 Class A conditions give the premises of the typing rules. The proof is a case analysis over
 the tables of 2.2; representative cases:
@@ -1405,7 +1427,7 @@ Two premises are **stronger than the specification**.
 The proofs are case analyses, so they are only as good as the enumeration behind them.
 
 ```
-enumerated   the 92 summary rules of spec 27, each classified
+enumerated   the summary rules of spec 27, each classified
              every occurrence of "validation error", by section
 read in full spec 2, 5, 7, 8, 11, 12, 13, 14, 16-22, 24-27
 scanned      spec 3 (imports), 9 (contracts), 23 (scheduling), the view half of spec 7
@@ -1443,7 +1465,8 @@ algorithm.
 *Proof.* By spec 12.1 and 12.2 the Object-bearing part of a body graph is a matching: each
 output port has outdegree one, each input port indegree one. The fate of a composite input
 port slot is either a node binding or a `returns` entry, and in the first case the node's own
-skeleton determines what follows. The graph is acyclic, so following it terminates, and at no
+skeleton determines what follows. The graph is acyclic (spec 10.2, rule 21b), so following it
+terminates, and at no
 step is there a choice. Provenance of an output port slot is likewise fixed by its `returns`
 entry. []
 
@@ -1905,8 +1928,9 @@ so no rule outside `F` is ever used. By Lemma C3 the premises of the rules used 
 other construct. Removing or adding rules outside `F` therefore leaves the derivation intact,
 and by Lemma C2 it is unique, so type and skeleton agree.
 
-The global conditions are feature-independent: node id uniqueness (spec 2.4), acyclicity
-(spec 12), `entry` (spec 10.3), reference resolution (spec 2.6.1), imports (spec 3). The
+The global conditions are feature-independent: node id uniqueness (spec 2.4, rule 10a),
+acyclicity of both dependency graphs (spec 10.2, rule 21b), `entry` (spec 10.3), reference
+resolution (spec 2.6.8), imports (spec 3). The
 `features` section itself (spec 4.1) is checked within `F`, since `feat(doc)` is a subset of
 `F`. []
 

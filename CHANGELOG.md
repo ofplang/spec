@@ -135,6 +135,29 @@ specification itself.
   property on its own, and restates the principle as a bound on the physical
   resources a workflow needs before it runs.
 
+- **2.4** node ids are unique within one composite body. The condition was never
+  stated, and without it `<node_id>.<output>` does not name one value. Also
+  **27 rule 10a**.
+- **10.2** the node dependency graph of a composite body must be acyclic. Only
+  the *process* dependency graph was required to be, which is a different graph:
+  it concerns which process invokes which, not the order of nodes within one
+  body. Nothing forbade a body whose nodes referred to each other in a cycle,
+  and a Pure Data cycle satisfied every degree rule of 12.1. Also
+  **27 rule 21b**, which states both graphs together.
+- **11.1.1** a literal is a `graph` phase value. `graph` is the least phase, so
+  this is what makes a literal admissible wherever a Pure Data value of any
+  phase is expected, and it is why no phase condition is ever stated for one.
+  Also **27 rule 87a**.
+- **27 rule 16a** the general phase-flow rule. 6 stated the order and the
+  permitted flow, but no summary rule did; rule 16 covers only the prohibition
+  on Object-bearing values at `graph` phase.
+- **4.4** three validation error examples: a value whose phase is later than the
+  port it fills, a duplicate node id, and a cycle in a body's node dependency
+  graph.
+- **2.6.8** a subsection for reference resolution. The rule applies to every
+  reference form of 2.6 and was the closing paragraph of 2.6.7, whose subject is
+  structured condition references.
+
 ### Changed
 
 - **2.6.7** no longer calls the `do_while` condition output a non-carry output,
@@ -164,6 +187,9 @@ specification itself.
   transform prescribes which output position an input slot arrives at.
 - **24.3** policy tracking through a transform is stated from that
   correspondence rather than from a worked example per kind.
+- **21** the restriction of `mode: drop` to Pure Data outputs is cited from
+  18.1, 19.1, and 20.1. The sentence draws a conclusion about `common`, which is
+  a `branch` mode, so 20.1 belongs among its grounds.
 
 ### Migrating from 0.0
 
@@ -219,6 +245,15 @@ forbade both as properties of an incomplete skeleton in 0.0 as it does now. What
 0.1 adds is the operational rule they follow from (12.2), so an implementation
 that checked only 12's degree rules may begin reporting documents it used to
 accept.
+
+Conditions now stated that were not stated before. A 0.0 document that meets
+them is unaffected; one that does not was never meaningful:
+
+- Two nodes of one composite body with the same `id`. A reference
+  `<node_id>.<output>` did not name one value, so an implementation resolved it
+  to one of them or rejected it, with nothing in the specification to say which.
+- A body whose node dependency graph has a cycle. Evaluation cannot start, and
+  the composition of the body's node skeletons (12.4.5) is not defined.
 
 Written for 0.1 and read by 0.0: a document declaring `spec_version: "0.1"` is
 refused by an implementation of 0.0 only if that implementation checks the

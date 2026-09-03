@@ -400,7 +400,7 @@ Phase *order* appears in exactly five places. None is omitted from a rule.
 1. ARG-VAR (7.1)            pi(variable) <= pi(port)
 2. <= (4.3)                 pi(variable) <= pi(port), for Object-bearing arguments
 3. RETURN (7.3)             pi(variable) <= pi(output port), for Object-bearing results
-4. LET-DOWHILE (7.7)        pi(max) in {graph, run}, written as |= Int @ run
+4. LET-DOWHILE (7.7)        pi(max) in {graph, run}, written as |= Int @ run   spec 11.2
 5. context well-formedness  Object-bearing implies pi /= graph (spec 6.1)
 ```
 
@@ -846,7 +846,7 @@ carry compatibility as for fold
 (In_f|B)^o is empty
 (Out_f)^o is a subset of W                       spec 19 requirement 3
 p in ports(Out_f) with tau_p = Bool, pi_p = data  the condition output
-Gamma |- k <= Int @ run                          spec 19 requirement 5
+Gamma |- k <= Int @ run                          spec 19 requirement 5, 11.2
 the value of k is at least 1                     spec 19 requirement 5
 
 Gamma |- z... <= In_f|B
@@ -1760,7 +1760,7 @@ one invocation. A composite has finitely many `let`s, and each contributes finit
 and `fold` invoke `L` times with `L` the length of a finite collection, `do_while` at most `k`
 times with `k` fixed before the run, `branch` once, an ordinary node once. []
 
-**The phase condition on `max_iterations` is what the bound rests on.** At `data` phase `k`
+**The upper bound on the `max_iterations` constant slot is what the bound rests on.** At `data` phase `k`
 would not be fixed before the run.
 
 Data computation sits outside: `python_script_processes` may run arbitrary Python. The claim is

@@ -399,6 +399,8 @@ value
 
 A source entry containing both `from` and `value`, or neither, is a validation error.
 
+A constant slot (11.2) is filled by a source entry of the same shape.
+
 #### 2.6.7 Structured condition references
 
 `branch.condition.from` uses a body dataflow reference.
@@ -677,7 +679,8 @@ fold or do_while carry output is missing
 branch arm has one-sided Object-bearing output
 branch arms have unequal Object skeletons
 Object-bearing value has graph phase
-value phase is later than the port it fills
+value phase is later than the port or constant slot it fills
+Object-bearing value fills a constant slot
 duplicate node id within a composite body
 cycle in a composite body's node dependency graph
 Object slot has multiple incompatible fates
@@ -1632,6 +1635,40 @@ A literal is a `graph` phase value. `graph` is the least phase (6), so a literal
 
 A literal is Pure Data. A literal bound to an Object-bearing port is a validation error, since a literal cannot introduce an Object identity (13).
 
+### 11.2 Constant slots
+
+A **constant slot** is a document position that expects a Pure Data value fixed no later than a declared phase. A constant slot declares two things: a **slot type**, which is a Pure Data v0 type expression, and a **phase upper bound**, which is `graph` or `run`.
+
+A constant slot is filled by a source entry (2.6.6): exactly one of `from` or `value`.
+
+```yaml
+max_iterations:
+  value: 100
+```
+
+```yaml
+max_iterations:
+  from: inputs.attempt_budget
+```
+
+A constant slot is treated as an input port whose declared type is the slot type and whose declared phase is the phase upper bound. The rules that govern a binding to an input port therefore govern a constant slot without addition:
+
+```text
+phase   the phase of the value must be no later than the upper bound (6, rule 16a).
+        A value of a later phase is a phase flow validation error.
+type    the resolved type of the value must match the slot type (11.1).
+literal a literal must conform to the slot type as 11.1.1 requires, and is a
+        graph phase value, so it satisfies every upper bound.
+```
+
+A constant slot is Pure Data. An Object-bearing value must not fill a constant slot, whether by `value` -- no literal denotes an Object (13) -- or by `from`.
+
+A `from` in a constant slot is a body dataflow reference (2.6.1) and is resolved in the scope of the composite body that contains the slot. Like any other body dataflow reference, it contributes an edge to that body's node dependency graph, which must remain acyclic (10.2, rule 21b).
+
+Where a slot's value is supplied by `value`, any further condition on the slot is decided at `graph` phase. Where it is supplied by `from`, it is decided at the earliest phase at which the value is determined, as a validation error or a preflight error (6.2).
+
+v0 defines one constant slot: `do_while.max_iterations` (19), of slot type `Int` with upper bound `run`.
+
 ---
 
 ## 12. Port Degree and Linearity Rules
@@ -2485,9 +2522,7 @@ Requirements:
 2. Each `carry` binding has a same-name, same-type, same-phase output on the target process, and an Object-bearing carry satisfies the threading requirement of section 16.
 3. Object-bearing outputs of the target process must be carry outputs. Non-carry Object-bearing outputs are forbidden in `do_while`.
 4. `condition.output` names a Boolean Data output of the target process.
-5. `max_iterations` is required, must be a graph/run phase integer, and must be greater than or equal to 1. A value of zero or a negative value is a validation error. This follows from do-while semantics: the target process is invoked at least once, and a bound of zero would contradict that guarantee.
-
-   Where `max_iterations` is given as a `value` literal, the condition is decided at graph phase. Where it is given by `from` from a graph or run phase port, it is decided at the earliest phase at which the value is determined, as a validation error or a preflight error (6.2).
+5. `max_iterations` is required. It is a constant slot (11.2) of slot type `Int` with phase upper bound `run`, and its value must be greater than or equal to 1. A value of zero or a negative value is a validation error. This follows from do-while semantics: the target process is invoked at least once, and a bound of zero would contradict that guarantee. The phase at which the bound of at least 1 is decided follows 11.2.
 6. Non-carry Data outputs may be exposed only using explicit output modes.
 
 `do_while` has no `each` section and requires no `carry` binding. Its iteration count comes from the condition output and `max_iterations` rather than from a traversal length, which is why the requirement `map` and `fold` carry -- at least one `each` source -- has no counterpart here. A `do_while` with no carry binding is meaningful: its target is a physical operation, and the condition output it returns may differ between invocations even though the node binds the same values each time.
@@ -3320,7 +3355,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 14. Object-bearing values are determined by recursive `object_slots`; Object identity belongs to Object slots, not to the enclosing Object-bearing value as a whole.
 15. Object-bearing values are linear: no fan-out, no implicit discard of contained Object slots. Within a composite body, every Object-bearing value -- a composite input port, an ordinary node's output port, or an output a structured node exposes -- is referred to exactly once (12.2).
 16. Object-bearing values are normally `data` phase; rare `run` phase is allowed; `graph` phase is invalid.
-16a. A value may flow from an earlier phase to a later phase but not the reverse; the order is `graph < run < data`. A binding whose value has a phase later than the port it fills is a validation error.
+16a. A value may flow from an earlier phase to a later phase but not the reverse; the order is `graph < run < data`. A binding or constant slot (11.2) whose value has a phase later than the port or slot it fills is a validation error.
 17. Ordinary node invocations use `state` for Object-bearing linear inputs and `bind` for Pure Data inputs.
 18. In `fold` and `do_while`, `carry` is loop-carried and may be Pure Data or Object-bearing.
 19. `branch` uses `args`, not `state`; Object-bearing branch arguments are supplied only to the selected arm. For a `branch`, the correspondence of rule 19a holds against each arm separately.
@@ -3328,7 +3363,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 19a. The binding entries of a node and the input ports of the process it invokes are in one-to-one correspondence: every input port is bound exactly once across the binding sections valid for the node kind, and every binding entry names an input port. v0 defines no default value for an input port.
 19b. A `map` node and a `fold` node must each have at least one `each` source; their traversal length is otherwise undetermined. `do_while` has no such requirement.
 19c. For an Object-bearing carry, the target process either has the carried input port's fate be the same-name output port, or consumes that input port and creates that output port. No other arrangement is valid.
-19d. `do_while` requires `max_iterations`, a graph or run phase integer of at least 1. A bound of zero or a negative value contradicts the guarantee that the target process is invoked at least once, and is a validation error.
+19d. `do_while` requires `max_iterations`, a constant slot (11.2) of slot type `Int` with phase upper bound `run`, whose value is at least 1. A bound of zero or a negative value contradicts the guarantee that the target process is invoked at least once, and is a validation error.
 20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths.
 21. Composite Object behavior is derived from body graph flow and `returns`, as the composition of the body's node skeletons (12.4.5).
 21a. A process's Object skeleton is the triple of a partial injection from its input Object slots to its output Object slots, the input slots it consumes, and the output slots it creates, each created slot carrying the node at which it is created. Object tracking completeness is completeness of that skeleton (12.4.6), and every process and node must have exactly one (12.4.7).

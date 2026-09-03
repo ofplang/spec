@@ -154,6 +154,13 @@ specification itself.
 - **4.4** three validation error examples: a value whose phase is later than the
   port it fills, a duplicate node id, and a cycle in a body's node dependency
   graph.
+- **11.2 Constant slots**, a document position that expects a Pure Data value
+  fixed no later than a declared phase, filled by a source entry (2.6.6) and
+  governed by the rules that govern a binding to an input port: the phase flow
+  of 6, the type match of 11.1, the literal conformance of 11.1.1. v0 has one,
+  `do_while.max_iterations`, whose type and phase conditions 19 stated for
+  itself because 11.1's table is indexed by binding section and a slot is not
+  one. Also **2.6.6**, which says a slot takes a source entry of the same shape.
 - **2.6.8** a subsection for reference resolution. The rule applies to every
   reference form of 2.6 and was the closing paragraph of 2.6.7, whose subject is
   structured condition references.
@@ -190,6 +197,11 @@ specification itself.
 - **21** the restriction of `mode: drop` to Pure Data outputs is cited from
   18.1, 19.1, and 20.1. The sentence draws a conclusion about `common`, which is
   a `branch` mode, so 20.1 belongs among its grounds.
+- **19** requirement 5 states `max_iterations` as a constant slot (11.2) rather
+  than as a phase and type condition of its own, and **27 rule 19d** with it.
+  **27 rule 16a** covers a constant slot alongside a binding, and **4.4** gains
+  an Object-bearing value filling one. What is decided at which phase is
+  unchanged; it is now said in one place.
 
 ### Migrating from 0.0
 

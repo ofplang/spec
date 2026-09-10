@@ -48,7 +48,7 @@ The shape of `map`, `fold`, and `do_while` is one family indexed by a single sca
 
 Where a loop's carry port is a scalar Object port, the series of Objects it holds is one series whatever n is: n stretches its length and does not change its form, and the loop's cost is `n x cost`. Where the carry port is a collection, n stretches the series and the target may also change its width from one iteration to the next. The per-iteration change follows from the target process's body and needs no declaration; the loop's cost is that change compounded n times. Both are bounded before the run under the condition below. Only the first is linear in n.
 
-`branch` is the only node kind without that property. If the two arms were allowed to differ in how they route Object identity, the shape would not be one family but the disjoint union of two shapes, and that is multiplicative under composition: a composite containing k branches would have up to 2^k resource profiles and Object series. Resource estimates such as the number of plates consumed, and the tracking of an individual Object, could then no longer be stated statically.
+`branch` is the only node kind without that property. If the two arms were allowed to differ in how they route Object identity, the shape would not be one family but the disjoint union of two shapes, and that is multiplicative under composition: a composite containing k branches would have up to 2^k shapes. Resource estimates and the tracking of an individual Object could then no longer be stated as one family.
 
 Section 20 requires the two arms to agree on the Object identities they expose for that reason. **`branch` is a branch in the Data dimension, and must be an identity in the Object dimension.** A conditional repetition that consumes and creates Objects is written with `do_while`, which satisfies this principle because it pushes its shape into the scalar n and bounds it with `max_iterations`.
 
@@ -1839,7 +1839,7 @@ nodes:
     process: cup_create     # b.cup, a different cup
 ```
 
-Where a `branch` creates an Object in both arms, the creation point is the `branch` node in both cases. Whichever arm runs, one new Object appears at that node's output, and where its identity came from does not depend on the arm.
+Where a `branch` creates an Object in both arms, the creation point is the `branch` node in both cases. Whichever arm runs, the new Objects appear at that node's output, and where their identity came from does not depend on the arm.
 
 A skeleton computed for a process *definition* has undetermined creation points, since the node that will invoke it is not known there. Equality is decided between skeletons placed at nodes.
 

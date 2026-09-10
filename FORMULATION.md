@@ -1525,8 +1525,9 @@ decides equality by normal form (5.6). The two decide the same set.
 | both consume, no Object-bearing output | equal | no common output; nothing to check |
 | one applies two transforms, the other none | equal, by Lemma S9 | valid |
 
-The second row is what node-anchored creation points decide (5.7). Whichever arm runs, one new
-Object appears at the node's output, so where its identity came from does not depend on the arm.
+The second row is what node-anchored creation points decide (5.7). Whichever arm runs, the new
+Objects appear at the node's output, so where their identity came from does not depend on the
+arm.
 
 On the last row. Unflattening and then flattening gives the identity
 correspondence (Lemma S9), so an arm that does both and an arm that does nothing have the same
@@ -1696,9 +1697,11 @@ invocation `i`, and `Fam` of an empty family is the empty family.
 *Proof.* 8a: `N` is a set and port names are unique within a process. 8b: identities within a
 port sit at distinct leaves of `sh(q)`.
 
-Where several identities share a creation point, a lifting by `Fam` was involved; `Fam` gives
-each component a distinct position. `LET-BRANCH` applies no lifting, so it creates one port's
-worth, and only one arm runs. []
+Several identities share a creation point in two ways, and 8b holds in both. A lifting by
+`Fam` gives each component a distinct position. A port of positive depth carries a family
+whatever put the identities there, so a `create` naming one (spec 14.3) fills every leaf of
+`sh(q)` at a single site, with no lifting involved. `LET-BRANCH` applies no lifting either, so
+it creates one port's worth, and only one arm runs. []
 
 **Lemma 8b does not say the IR can tell them apart.** Spec 2.6.2 gives no way to address a
 collection element. A creation point is a static site, not a run-time identity.

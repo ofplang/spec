@@ -65,7 +65,17 @@ specification itself.
   `n x cost` holds for a scalar carry port, and a collection carry port may
   change width per iteration, the change following from the target's body. No
   rule, declaration, or validation requirement is added.
-- **14.3**, **20.2**, **27 rule 26**, and `FORMULATION.md` **15.6** apply
+
+  The `branch` paragraph is corrected with it. It said that arms free to differ
+  would leave "the number of plates consumed" unable to be "stated statically",
+  which reads as though a count were statically stated as things are. It is
+  not, and was not before: arms already create and consume different numbers,
+  since a skeleton records provenance and not count (12.4.3). What differing
+  arms would cost is that the shape is one family -- the disjoint union the
+  same sentence names -- so the estimate is what can no longer be stated as
+  one family, and the count does not enter it.
+- **12.4.3**, **14.3**, **20.2**, **27 rule 26**, and `FORMULATION.md` **13.7**
+  and **15.6** apply
   12.4.1, which already says that a collection port's Object slots are a family
   indexed at run time rather than one slot. Each was written as though an
   Object-bearing port carried exactly one identity: `create` introduced "a new
@@ -78,6 +88,14 @@ specification itself.
   needs. No proposition or proof of `FORMULATION.md` changes: 15.6 discharges
   the iteration case of Proposition 2c, and what it gives that proof -- the
   intermediates cancel -- is unaffected by writing the widths as `w_i`.
+
+  `FORMULATION.md` **14.6** has the same correction one step further back. The
+  remark after Lemma 8 read that several identities sharing a creation point
+  means a lifting by `Fam` was involved, which a `create` naming a port of
+  positive depth does without any lifting. Lemma 8b is unaffected -- its proof
+  is that identities within a port sit at distinct leaves of `sh(q)`, which
+  holds however they got there -- but the remark is what a reader arriving at
+  that section alone would take the lemma to rest on.
 
 ### Migrating from 0.1
 

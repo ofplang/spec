@@ -51,6 +51,33 @@ specification itself.
   **27 rule 16a** covers a constant slot alongside a binding, and **4.4** gains
   an Object-bearing value filling one. What is decided at which phase is
   unchanged; it is now said in one place.
+- **1.1** the resource guarantee is stated with the condition it needs. It read
+  that the upper bound on the physical resources a workflow needs is fixed
+  before the run, without qualification, and that was not so: an atomic process
+  may declare an `Array` output whose length nothing relates to its inputs, and
+  a `create` on such a port, or a `map` traversing such a value, then introduces
+  a number of Objects that no length in the document reaches. The condition
+  names what has to hold of an atomic's `Array` output ports -- derivable from
+  `objects.map` / `objects.transform` / `object_identity_map`, or bounded by
+  something v0 does not check -- and says what is still true without it: the
+  workflow creates finitely many Objects, but no bound is fixed before the run.
+  **Finiteness is not boundedness.** The symbolic estimate is corrected with it:
+  `n x cost` holds for a scalar carry port, and a collection carry port may
+  change width per iteration, the change following from the target's body. No
+  rule, declaration, or validation requirement is added.
+- **14.3**, **20.2**, **27 rule 26**, and `FORMULATION.md` **15.6** apply
+  12.4.1, which already says that a collection port's Object slots are a family
+  indexed at run time rather than one slot. Each was written as though an
+  Object-bearing port carried exactly one identity: `create` introduced "a new
+  Object identity", a `branch` whose arms both create had "one new Object"
+  appear at its output, and a replacing carry over `n` iterations created `n`
+  identities. All three hold at depth 0 only. Skeleton equality is agreement on
+  provenance and not on count (12.4.3), so a `branch` whose arms create
+  collections may create a different number of Objects in each; what does not
+  depend on the arm is where those identities came from, which is what 24.1
+  needs. No proposition or proof of `FORMULATION.md` changes: 15.6 discharges
+  the iteration case of Proposition 2c, and what it gives that proof -- the
+  intermediates cancel -- is unaffected by writing the widths as `w_i`.
 
 ### Migrating from 0.1
 

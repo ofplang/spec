@@ -1854,19 +1854,25 @@ Once freeness is available the proof is one line.
 
 ### 15.6 Intermediate identities
 
-A replacing carry over `n` iterations creates `n` identities and consumes `n-1` internally. The
-trace records per node (10), so an intermediate identity appears in both sets.
+Write `w_i` for the number of identities the carry port holds after iteration `i`, so
+`w_0 = |Ids(in)|` and `w_n = |Ids(out)|`. A replacing carry consumes one width and creates one
+width per iteration. The trace records per node (10), so the intermediate widths
+`I = w_1 + ... + w_{n-1}` appear in both sets.
 
 ```
-cons(l) = { the input identity } union { the n-1 intermediates }
-crea(l) = { the n-1 intermediates } union { the output identity }
+cons(l) = { the w_0 input identities } union { the I intermediates }
+crea(l) = { the I intermediates } union { the w_n output identities }
 ```
 
 The count still holds, the intermediates cancelling:
 
 ```
-|Ids(out)| = |Ids(in)| - (1 + (n-1)) + ((n-1) + 1) = |Ids(in)|
+|Ids(out)| = |Ids(in)| - (w_0 + I) + (I + w_n) = w_n
 ```
+
+For a scalar carry port every `w_i` is 1 and this reads `|Ids(out)| = |Ids(in)|`. For a
+collection carry port the widths need not agree, and what conservation gives is that the
+intermediates cancel -- not that the count is preserved.
 
 **(iii) and (iv) are containments, not equalities.** Where a `fold` has an empty `each` and a
 replacing carry, the skeleton declares a consumption and a creation that do not occur

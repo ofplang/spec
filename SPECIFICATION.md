@@ -44,7 +44,9 @@ Every structured node kind is designed to that principle:
 | `do_while` | the body n times, in series | iteration count n | `max_iterations` |
 | `branch` | a single shape | none | - |
 
-The shape of `map`, `fold`, and `do_while` is one family indexed by a single scalar. Object consumption can therefore be estimated symbolically as `L x cost` or `n x cost`, and for `do_while` the bound is static, given by `max_iterations`. The series of Objects held by a carry slot is one series whatever n is: n stretches its length and does not change its form.
+The shape of `map`, `fold`, and `do_while` is one family indexed by a single scalar. A traversal's Object consumption can therefore be estimated symbolically as `L x cost`, and for `do_while` the iteration count is bounded statically, given by `max_iterations`.
+
+Where a loop's carry port is a scalar Object port, the series of Objects it holds is one series whatever n is: n stretches its length and does not change its form, and the loop's cost is `n x cost`. Where the carry port is a collection, n stretches the series and the target may also change its width from one iteration to the next. The per-iteration change follows from the target process's body and needs no declaration; the loop's cost is that change compounded n times. Both are bounded before the run under the condition below. Only the first is linear in n.
 
 `branch` is the only node kind without that property. If the two arms were allowed to differ in how they route Object identity, the shape would not be one family but the disjoint union of two shapes, and that is multiplicative under composition: a composite containing k branches would have up to 2^k resource profiles and Object series. Resource estimates such as the number of plates consumed, and the tracking of an individual Object, could then no longer be stated statically.
 
@@ -54,7 +56,29 @@ For the same reason v0 does not admit a `branch` whose arms declare different po
 
 **Restated in terms of resources**
 
-This principle guarantees that the upper bound on the physical resources a workflow needs is fixed before the workflow runs. Just as `max_iterations` bounds the iteration count, the static shape of the Object-flow graph bounds the number of Objects consumed. A description whose consumption depends on a branch taken at run time is not admitted for that reason.
+Under the condition below, the upper bound on the physical resources a workflow needs is fixed before the workflow runs. Just as `max_iterations` bounds the iteration count, the static shape of the Object-flow graph bounds the number of Objects consumed. A description whose consumption depends on a branch taken at run time is not admitted for that reason.
+
+**The condition.** Every `Array` output port of every atomic process has a length that is either derivable or bounded.
+
+```text
+derivable  the length follows from the process's own Object declarations:
+           objects.map (14.1), objects.transform (14.4), or the
+           object_identity_map inference (15). Each relates the output's slot
+           family to an input's, so the length comes with it.
+bounded    the length is bounded by something outside those declarations -- a
+           contract, or knowledge of the process. v0 does not check this. A
+           statement of atomic process behavior is trusted, as 14.1 trusts one.
+```
+
+A Pure Data `Array` output has no derivation available: the `objects` section describes Object behavior, and a Pure Data port has no Object slots for it to relate. Such a port meets the condition only by the second clause.
+
+Where the condition holds and every `run` phase argument is given, an upper bound on the number of Objects the workflow creates is determined, and is constructed by one traversal of the body. Every other length in a document is reached from those: a literal (11.1.1), an argument, a collected output (17, 18), a transform (14.4), the arms of a `branch` (20), or a loop bounded by `max_iterations` (19). The process dependency graph and each body's node dependency graph are acyclic (10.2), so the traversal terminates.
+
+Where the condition does not hold, the workflow still creates finitely many Objects -- every traversal is over a finite collection and every loop is bounded -- but no upper bound is fixed before the run. **Finiteness is not boundedness**, and the table above says finiteness.
+
+The condition is a property of atomic processes, which v0 cannot see into. It is stated here rather than as a validation rule for that reason. An implementation may report an atomic `Array` output port that meets neither clause; a document with no such port is one for which this section's guarantee holds.
+
+How many Objects a declaration introduces at a collection port is 14.3; what a scheduling policy then targets is 24.1.
 
 This principle is weaker than the uniqueness of the Object skeleton (12.4.7). Two descriptions may agree on how many Objects they consume and create and still have different skeletons, if what an output Object's identity comes from is not the same; 12.4.7 forbids that separately.
 
@@ -2055,13 +2079,15 @@ objects:
 
 ### 14.3 `create`
 
-`create` introduces a new Object identity.
+`create` introduces a new Object identity at every Object slot of the named output port.
 
 ```yaml
 objects:
   create:
     - outputs.sample
 ```
+
+For a scalar Object port that is one identity. For a collection port it is the whole slot family, and this declaration does not fix its size: a skeleton names the port and never an index (12.4.1). The condition under which that number is bounded before the run is 1.1.
 
 ### 14.4 `transform`
 
@@ -2722,7 +2748,9 @@ the arms use different correspondence kinds for
   the same output slot                               the kind disagrees          error
 ```
 
-The second row is what the creation point being a node rather than a process definition decides (12.4.3). Where both arms create, the creation point is this `branch` node in both cases: whichever arm runs, one new Object appears at this node's output, so where its identity came from does not depend on the arm and the skeletons are equal.
+The second row is what the creation point being a node rather than a process definition decides (12.4.3). Where both arms create, the creation point is this `branch` node in both cases: whichever arm runs, the new Objects appear at this node's output, so where their identity came from does not depend on the arm and the skeletons are equal.
+
+For a collection output the arms need not create the same *number* of Objects. A skeleton names the port and not the size of its slot family (12.4.1), and the normal form carries the port name and the creation point and not a count (12.4.3). Skeleton equality is agreement on provenance, not on count. For the resource consequence see 1.1; for what a policy then targets see 24.1.
 
 Where `else` is omitted, the implicit arm's skeleton is the identity correspondence from each Object-bearing entry of `args` to the same-name output (12.4.5, 20.3). The `then` arm must therefore have that same skeleton: an arm that consumes or creates an Object needs an explicit `else` that does the same.
 
@@ -2734,7 +2762,9 @@ Skeleton equality is decided statically and the validator checks it. An executio
 
 **Relation to policies**
 
-Because of this requirement, the target of a scheduling policy does not depend on the selected arm. A policy target follows the skeleton (24.1), and equal skeletons give the same physical Object identities whichever arm runs.
+Because of this requirement, *which value* a scheduling policy targets does not depend on the selected arm. A policy target follows the skeleton (24.1), and equal skeletons give that target the same provenance whichever arm runs.
+
+Where the target is a collection, the number of Object identities it contains may still differ between the arms (12.4.1). A policy applies to each contained identity individually (24.1), so how many identities it applies to is settled at run time. What does not depend on the arm is where those identities came from.
 
 Future versions may introduce an explicit feature for policy transfer semantics across Object replacement or conditional Object provenance. That feature is outside v0. v0 does not infer or perform policy transfer across `consume` / `create`, and branch does not provide conditional policy target semantics.
 
@@ -3374,7 +3404,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 23. Every Object slot must have exactly one fate or provenance.
 24. `map` preserves physical identity, and the resolved types of an entry's source and target must match (14.1).
 25. `consume` ends an input Object identity.
-26. `create` introduces a new Object identity.
+26. `create` introduces a new Object identity at every Object slot of the named output port; for a collection port the declaration does not fix how many (14.3, 12.4.1).
 27. `consume + create` is Object replacement; policy and `.view` metadata do not automatically transfer across replacement.
 28. v0 standard transforms are `array_flatten` and `array_unflatten`; they have no `params`, require strict role typing, apply only to Object-bearing paths, and fix the correspondence between input and output Object slots as an order-preserving total bijection.
 29. `object_identity_map` is a process-level behavior marker and inference permission, declared under a process's `behavior` section; it is not a type trait or a structured-control requirement, and it does not say the process may be skipped.

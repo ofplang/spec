@@ -714,7 +714,7 @@ Object slot has multiple incompatible provenances
 unknown v0 transform kind
 invalid transform role set
 transform role type mismatch
-Pure Data path appears in objects.transform
+Pure Data path appears in an objects declaration
 transform path participates in multiple incompatible Object fates or provenances
 node carries a section that is not valid for its node kind
 process declares a behavior marker v0 does not define
@@ -2017,6 +2017,12 @@ outputs.<path>
 
 Short forms such as `cup: cup` are not canonical v0 syntax.
 
+Every path in `objects` must name an Object-bearing port. A path naming a Pure Data port is a validation error, in `map`, `consume`, `create`, and `transform` alike.
+
+All four declarations are defined over Object slots: `map` relates the slots of two ports, `consume` ends those of an input port, `create` introduces one at every slot of an output port, and `transform` fixes a correspondence between the slots on each side. A Pure Data port has no slots -- `object_slots` is empty for it (5.2) -- so such an entry declares nothing, and the completeness check of 13.1, which quantifies over Object slots, never reaches it. It can only be a mistake about which port was meant, and is reported rather than passed over in silence.
+
+For a generic process the condition is decided without instantiation, unlike the slot accounting of 13.1: a type parameter declares its domain and is instantiated only with a type of that domain (8), so a port whose type names one is already known to be Object-bearing or not.
+
 ### 14.1 `map`
 
 `map` preserves physical Object identity.
@@ -2136,8 +2142,6 @@ What each criterion rejects: a value-dependent rearrangement such as sorting or 
 
 A transform entry is validated from its declared `kind`, its role names, and the resolved types of its input and output paths.
 
-All paths in `objects.transform` must refer to Object-bearing values. A Pure Data path in `objects.transform` is a validation error.
-
 Each transform kind defines an exact set of required input and output roles. Missing roles, extra roles, invalid namespaces, paths that do not exist, or role type mismatches are validation errors.
 
 For v0 transform kinds, role typing is:
@@ -2152,7 +2156,7 @@ array_unflatten:
   outputs.xss: Array<Array<T>>
 ```
 
-In each case, the same `T` must be used consistently within that transform entry, and the referenced paths must be Object-bearing after type resolution.
+In each case, the same `T` must be used consistently within that transform entry.
 
 Each transform kind contributes to the process's Object skeleton a correspondence of kind `order_preserving` (12.4.2). It fixes the correspondence between its input Object slots and its output Object slots as an **order-preserving total bijection**: the Object slots contained in the input, listed in traversal order, and those contained in the output, listed in traversal order, correspond one to one in that order.
 
@@ -3396,7 +3400,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 19b. A `map` node and a `fold` node must each have at least one `each` source; their traversal length is otherwise undetermined. `do_while` has no such requirement.
 19c. For an Object-bearing carry, the target process either has the carried input port's fate be the same-name output port, or consumes that input port and creates that output port. No other arrangement is valid.
 19d. `do_while` requires `max_iterations`, a constant slot (11.2) of slot type `Int` with phase upper bound `run`, whose value is at least 1. A bound of zero or a negative value contradicts the guarantee that the target process is invoked at least once, and is a validation error.
-20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths.
+20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths, and every such path must name an Object-bearing port (14).
 21. Composite Object behavior is derived from body graph flow and `returns`, as the composition of the body's node skeletons (12.4.5).
 21a. A process's Object skeleton is the triple of a partial injection from its input Object slots to its output Object slots, the input slots it consumes, and the output slots it creates, each created slot carrying the node at which it is created. Object tracking completeness is completeness of that skeleton (12.4.6), and every process and node must have exactly one (12.4.7).
 21b. Two dependency graphs must be acyclic, and they are different graphs. The process dependency graph is acyclic: a composite must not depend on itself, directly or through others (10.2). Within one composite body, the node dependency graph must also be acyclic; it has an edge from one node to another where a `from` in a binding or control section (21.0) of the second names an output of the first. A cycle in either is a validation error.
@@ -3406,7 +3410,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 25. `consume` ends an input Object identity.
 26. `create` introduces a new Object identity at every Object slot of the named output port; for a collection port the declaration does not fix how many (14.3, 12.4.1).
 27. `consume + create` is Object replacement; policy and `.view` metadata do not automatically transfer across replacement.
-28. v0 standard transforms are `array_flatten` and `array_unflatten`; they have no `params`, require strict role typing, apply only to Object-bearing paths, and fix the correspondence between input and output Object slots as an order-preserving total bijection.
+28. v0 standard transforms are `array_flatten` and `array_unflatten`; they have no `params`, require strict role typing, and fix the correspondence between input and output Object slots as an order-preserving total bijection.
 29. `object_identity_map` is a process-level behavior marker and inference permission, declared under a process's `behavior` section; it is not a type trait or a structured-control requirement, and it does not say the process may be skipped.
 30. For Object-bearing Arrays, `object_identity_map` preserves length, nesting, order, and contained Object identities.
 31. Structured node features are `node_map`, `node_fold`, `node_do_while`, and `node_branch`.

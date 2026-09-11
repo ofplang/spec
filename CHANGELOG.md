@@ -11,6 +11,18 @@ specification itself.
 
 ### Added
 
+- **14** every path in an `objects` section must name an Object-bearing port,
+  in `map`, `consume`, and `create` as well as in `transform`. Only 14.4.1 said
+  it, and only of `transform`, so a `create: [outputs.n]` on an `Int` port, a
+  `consume` of a Pure Data input, and a `map` between two Pure Data ports were
+  all well-formed. They are not no-ops that happen to be harmless: the four
+  declarations are defined over Object slots, a Pure Data port has none (5.2),
+  and 13.1 quantifies over slots, so nothing downstream ever looked at such an
+  entry -- including the type match 14.1 requires of a `map`. The entry named a
+  port other than the one meant, and said so nowhere. Also **27 rule 20**;
+  **4.4**, whose example is now an `objects` declaration rather than
+  `objects.transform`; and **27 rule 28**, which stops repeating the transform
+  case of a rule now stated for all four.
 - **2.4** node ids are unique within one composite body. The condition was never
   stated, and without it `<node_id>.<output>` does not name one value. Also
   **27 rule 10a**.

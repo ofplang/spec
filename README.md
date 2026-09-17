@@ -3,7 +3,7 @@
 The specification for **Object-flow Programming Language v0** — a YAML-based
 dataflow workflow IR with linear Object tracking.
 
-- [SPECIFICATION.md](SPECIFICATION.md) — the specification, revision **0.1**.
+- [SPECIFICATION.md](SPECIFICATION.md) — the specification, revision **0.2**.
 - [CHANGELOG.md](CHANGELOG.md) — what changed between revisions, and what a
   document written against an earlier one has to do about it.
 

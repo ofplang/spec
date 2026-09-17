@@ -1,7 +1,7 @@
 # Object-flow Programming Language v0 Specification
 
-Revision: 0.2 (draft)  
-Date: unreleased  
+Revision: 0.2  
+Date: 2026-09-17  
 Supersedes: revision 0.1 (2026-09-01). CHANGELOG.md records what changed and what a document written against 0.1 has to do about it. A 0.1 document stays valid unless it had two nodes of one body with the same `id`, or a body whose nodes referred to each other in a cycle; neither was meaningful, and neither was forbidden by anything 0.1 said.
 
 A document names the revision it is written against with `spec_version` (2.1). This revision states four conditions that 0.1 relied on without stating: node ids are unique within a body, a body's node dependency graph is acyclic, a value flows only into an equal-or-later phase, and a literal is a `graph` phase value. It also names the kind of position `max_iterations` occupies, a constant slot (11.2).

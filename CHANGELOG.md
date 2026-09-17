@@ -7,6 +7,12 @@ This file records what changed and what a document written against the previous
 revision has to do about it. Why a rule is the way it is belongs in the
 specification itself.
 
+## 0.3 (unreleased)
+
+No normative change yet. The revision is open so that a change has a section to
+land in; until one does, 0.3 holds the rules of 0.2.
+
+
 ## 0.2 - 2026-09-17
 
 ### Added

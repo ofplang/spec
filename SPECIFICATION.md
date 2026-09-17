@@ -1,10 +1,12 @@
 # Object-flow Programming Language v0 Specification
 
-Revision: 0.2  
-Date: 2026-09-17  
-Supersedes: revision 0.1 (2026-09-01). CHANGELOG.md records what changed and what a document written against 0.1 has to do about it. A 0.1 document stays valid unless it had two nodes of one body with the same `id`, or a body whose nodes referred to each other in a cycle; neither was meaningful, and neither was forbidden by anything 0.1 said.
+Revision: 0.3 (draft)  
+Date: unreleased  
+Supersedes: revision 0.2 (2026-09-17), released and tagged `v0.2`. CHANGELOG.md records what changed and what a document written against 0.2 has to do about it.
 
-A document names the revision it is written against with `spec_version` (2.1). This revision states four conditions that 0.1 relied on without stating: node ids are unique within a body, a body's node dependency graph is acyclic, a value flows only into an equal-or-later phase, and a literal is a `graph` phase value. It also names the kind of position `max_iterations` occupies, a constant slot (11.2).
+A document names the revision it is written against with `spec_version` (2.1). This revision is open and states no change of its own yet, so it holds the rules of 0.2 and a 0.2 document is a valid document under it.
+
+Revision 0.2 stated four conditions that 0.1 relied on without stating: node ids are unique within a body, a body's node dependency graph is acyclic, a value flows only into an equal-or-later phase, and a literal is a `graph` phase value. It also named the kind of position `max_iterations` occupies, a constant slot (11.2), and corrected 1.1's upper bound on the physical resources a workflow needs, which holds only under a condition 1.1 did not state.
 
 Revision 0.1 removed the `array_uncons`, `array_cons` and `array_reverse` transform kinds and the `last` output mode, renamed the `elidable_iso` marker to `object_identity_map` and moved it to a process's `behavior` section, added the `array_flatten` and `array_unflatten` transform kinds and the `do_while` node's reserved `exhausted` output, and introduced the Object skeleton (12.4), in terms of which Object tracking completeness, the identity-map marker, a transform's correspondence, a branch's two arms, and a scheduling policy's target are all stated.
 
@@ -91,7 +93,7 @@ An operation whose consumed quantity genuinely varies at run time is expressed b
 A v0 document may contain:
 
 ```yaml
-spec_version: "0.2"
+spec_version: "0.3"
 features: []
 traits: {}
 types: {}
@@ -104,7 +106,7 @@ entry: main
 A v0 document may declare the revision of this specification it is written against, using the top-level `spec_version` field.
 
 ```yaml
-spec_version: "0.2"
+spec_version: "0.3"
 ```
 
 If present, the value must be a string using a two-number version format:
@@ -134,7 +136,7 @@ An earlier MINOR is accepted rather than refused because a revision within one M
 **The current revision**
 
 ```text
-0.2
+0.3
 ```
 
 An implementation states the revision it implements. Two implementations of different revisions may therefore disagree about one document, and the declaration is what makes that disagreement legible rather than silent.

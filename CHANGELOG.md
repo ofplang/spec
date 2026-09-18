@@ -9,8 +9,41 @@ specification itself.
 
 ## 0.3 (unreleased)
 
-No normative change yet. The revision is open so that a change has a section to
-land in; until one does, 0.3 holds the rules of 0.2.
+### Added
+
+- **28 Feature: `units`**, an experimental feature (4.5) that annotates `Int`
+  and `Float` with a unit. A unit is part of the type, so every rule that
+  requires two types to be the same requires their units to agree, and 11.1,
+  16, 8.1 and the structured node output rules need no addition of their own.
+  Unit atoms are opaque and must be declared in a top-level `units` section;
+  v0 defines no registry, no dimensions and no conversion, so a conversion is
+  written as an ordinary atomic process (28.6) and is trusted as `objects.map`
+  is. Every unit condition is decided at graph phase, and a unit has no runtime
+  representation, so an implementation may discard every annotation once
+  validation has succeeded. Also **4.2**, **4.3**, **4.4**, **2**, **2.2**,
+  **2.3**, **2.4**, **2.5**, **7.1**, **7.3**, **7.4**, **8.1**, **9.2**,
+  **11.1**, **11.1.1**, and **27 rules 3a, 50a, 54a, 81a, 86a**.
+- **4.5 Experimental features**, the category an experimental feature belongs
+  to. It adds a stability disclaimer and a diagnostics recommendation to 4.1
+  through 4.4, and permits a feature's own section to define a diagnostic
+  validation mode. It changes no rule of 4.1 through 4.4.
+
+### Changed
+
+- **2.3**, **26**, **27 rule 6** and **27 rule 45** name the `unit` string of a
+  scheduling preference payload explicitly, and say it is unrelated to the unit
+  expressions of 28. The two are different things and the word was doing double
+  duty in four places.
+- **2**, **2.3** and **27 rule 9** list `units` among the sections whose
+  omission is an empty mapping.
+
+### Migrating from 0.2
+
+- `units` is now a reserved name (2.4). A document that uses it as a process
+  name, port name, node id, binding name, return name, type name, trait name or
+  type parameter name must rename it. Every document in this organization's
+  repositories was scanned before the name was reserved -- 1984 files, 1956
+  YAML documents -- and none used it in any of those positions.
 
 
 ## 0.2 - 2026-09-17

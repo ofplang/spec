@@ -95,6 +95,7 @@ A v0 document may contain:
 ```yaml
 spec_version: "0.3"
 features: []
+units: {}
 traits: {}
 types: {}
 processes: {}
@@ -147,7 +148,7 @@ The processing order is:
 
 1. Resolve `$import` structurally.
 2. Validate document shape, reserved keys, and reserved metadata field formats.
-3. Resolve types, type traits, view schemas, phases, and process references.
+3. Resolve types, unit atoms, type traits, view schemas, phases, and process references.
 4. Derive required features from the expanded document body.
 5. Validate the declared `features` section, if present.
 6. Type-check node bindings and structured node outputs.
@@ -166,13 +167,13 @@ Implementation extension keys are allowed only when they use the reserved extens
 
 The v0-defined optional `description` key (2.7) is allowed at the document root and at trait, type, and process definition mappings. It is a v0-defined key, not an extension key, so a document using `description` remains strict portable v0.
 
-The `scheduling.policies[*].prefer` payload has a v0-defined closed shape for v0-defined scheduling preference kinds. Unit strings inside scheduling preference payloads are implementation-defined strings in v0. Extension preference kinds and extension payload fields are allowed only in extension-tolerant mode when they use the reserved extension-key prefix `x-`.
+The `scheduling.policies[*].prefer` payload has a v0-defined closed shape for v0-defined scheduling preference kinds. The `unit` strings inside scheduling preference payloads are implementation-defined strings in v0, and are unrelated to the unit expressions of 28. Extension preference kinds and extension payload fields are allowed only in extension-tolerant mode when they use the reserved extension-key prefix `x-`.
 
 For every mapping position, the specification defines a shape schema consisting of allowed keys, required keys, value kinds, and conditional requirements. A value-kind mismatch, missing required key, unexpected sequence item shape, or unexpected `null` value is a validation error unless explicitly allowed by the relevant schema rule.
 
 `null` values are not valid in v0 portable YAML. Future feature extensions may define nullable values explicitly, but v0 core does not.
 
-Omitted `traits`, `types`, `inputs`, and `outputs` sections are interpreted as empty mappings. The `features` section may be omitted and is then interpreted as the feature set derived from the expanded document body. The `processes` section is required.
+Omitted `units`, `traits`, `types`, `inputs`, and `outputs` sections are interpreted as empty mappings. The `features` section may be omitted and is then interpreted as the feature set derived from the expanded document body. The `processes` section is required.
 
 A process that has no input ports may omit `inputs`. A process that has no output ports may omit `outputs`. Omitted `inputs` and `outputs` are equivalent to empty mappings.
 
@@ -255,9 +256,12 @@ requires
 ensures
 behavior
 exhausted
+units
 ```
 
 Every name in that list but the last is a structural key of the document. `traits` stays reserved as the name of the top-level section that declares type traits (7.3); a process declares its behavior markers under `behavior` (15), which is a different vocabulary. `exhausted` is there for the other reason a name is reserved: a `do_while` node exposes a reserved output of that name (19.3), so were a target process free to declare an output called `exhausted`, a reference to `<node>.exhausted` would name two different values and there would be no way to say which.
+
+Unit atom names occupy a namespace of their own, declared in the top-level `units` section (28.1). The reserved names listed above do not apply to unit atom names, and a unit atom name may coincide with a type name, a trait name, a process name, or a port name.
 
 View field names are deliberately absent from that list: they must match the identifier grammar and must not contain `.`, but a reserved name is allowed. A view field name occurs in only two places, and in neither can it be confused with a structural key. In a view schema the field name is the outer key and the declaration keys `type` and `value` are inside it, so `value: {type: Int}` declares a field named `value`. In a contract reference the field is the single segment after `.view`, so `inputs.x.view.value` reads that field. Reserving names here would cost expressiveness without removing an ambiguity.
 
@@ -273,11 +277,17 @@ In v0 portable YAML, every `type` field value must be a YAML string scalar conta
 The v0 type expression grammar is:
 
 ```text
-TypeExpr      ::= TypeAtom | ArrayType
+TypeExpr      ::= TypeAtom UnitSuffix? | ArrayType
 ArrayType     ::= "Array" "<" S? TypeExpr S? ">"
 TypeAtom      ::= Identifier
 Identifier    ::= [A-Za-z_][A-Za-z0-9_]*
 S             ::= one or more ASCII space or tab characters
+
+UnitSuffix    ::= "[" UnitExpr "]"
+UnitExpr      ::= "1" | UnitTerm (("*" | "/") UnitTerm)*
+UnitTerm      ::= UnitIdent Exponent?
+Exponent      ::= "^" "-"? [1-9][0-9]*
+UnitIdent     ::= [A-Za-z_][A-Za-z0-9_]*
 ```
 
 Whitespace is allowed only immediately inside the angle brackets of `Array<T>`. Therefore the following type expressions are valid and have the same meaning:
@@ -302,6 +312,8 @@ The recommended canonical style is to write type expressions without whitespace:
 Array<T>
 Array<Array<Sample>>
 ```
+
+A unit suffix is defined by the `units` feature (28). Whitespace is not allowed inside a unit suffix, nor between a type atom and its suffix.
 
 The only built-in primitive Data types are:
 
@@ -335,6 +347,8 @@ A type parameter must not shadow a top-level user-defined type name or a reserve
 Unknown type names are validation errors. Malformed type expressions are validation errors. A `type` field whose value is not a YAML string scalar is a shape validation error.
 
 No other type constructors or type syntax are defined by v0. In particular, `Optional<T>`, `Result<T,E>`, union types, nullable suffixes such as `T?`, map types, tuple types, function types, and multiple type arguments are not valid v0 type expressions.
+
+A unit suffix is valid only where the `units` feature is in effect, and only on `Int` and `Float` (28.2).
 
 Names such as `Optional`, `Result`, and `Map` are not reserved by v0 merely because future versions may define additional type constructors.
 
@@ -632,7 +646,10 @@ node_branch
 generic_processes
 python_script_processes
 scheduling_policies
+units
 ```
+
+`units` is an **experimental** feature (4.5).
 
 ### 4.3 Feature derivation
 
@@ -668,6 +685,20 @@ scheduling_policies
 ```
 
 The `scheduling_policies` feature covers both scalar Object policy targets and Object-bearing collection policy targets. No separate `object_collection_policies` feature is defined in v0.
+
+A type expression containing a unit suffix (28.2) requires:
+
+```text
+units
+```
+
+A non-empty `units` section requires:
+
+```text
+units
+```
+
+A unit suffix requires the feature even where the unit expression is dimensionless. `Float[1]` is the same type as `Float` (28.5), but writing it is use of the syntax.
 
 ### 4.4 Unsupported features vs validation errors
 
@@ -729,6 +760,13 @@ node binding names no input port of the target process
 target process input port is not bound, or is bound more than once
 do_while node outputs section lists the reserved output exhausted
 zip-equal traversal length mismatch known at graph phase
+unit mismatch between a binding source and its target port
+unit mismatch in a contract expression
+unit suffix on a type that is not Int or Float
+malformed unit expression
+undeclared unit atom
+duplicate unit atom name in the units section
+units entry whose value is not an empty mapping
 ```
 
 The last entry is conditional on what the implementation determines rather than an
@@ -755,7 +793,18 @@ workflow uses kind: branch but implementation lacks node_branch
 workflow uses generic processes but implementation lacks generic_processes
 workflow uses scheduling policies but implementation lacks scheduling_policies
 workflow uses script.language: python but implementation lacks python_script_processes
+workflow uses unit suffixes but implementation lacks units
 ```
+
+### 4.5 Experimental features
+
+A v0-defined feature may be marked **experimental**. An experimental feature is an ordinary v0 feature for the purposes of 4.1 through 4.4: it is declared in `features`, it is derived from the document body by the rules of 4.3, and an implementation that does not support it is subject to 4.4.
+
+The marking adds two things. **Stability**: the specification of an experimental feature may be changed or removed in a later revision of v0 without a migration path, where a non-experimental feature would be given one. **Diagnostics**: an implementation should report that a document requires an experimental feature, whether the requirement was declared or derived, so that an author can notice a dependency introduced through `$import`.
+
+A document that depends on an experimental feature should list that feature explicitly in `features` even though 4.1 allows the set to be derived. This is a recommendation, not a validation requirement.
+
+An experimental feature's own section may define a diagnostic validation mode in which checking for that feature is disabled. Such a mode is not a conformance criterion, and the conditions it must satisfy are stated by that section.
 
 ---
 
@@ -908,6 +957,8 @@ String
 
 These primitive types are Pure Data types. They have no Object slots.
 
+Under the `units` feature, `Int` and `Float` may carry a unit suffix, which is part of the type (28). A unit suffix does not change the set of built-in primitive types and does not give a primitive type an Object slot.
+
 v0 defines one built-in type constructor:
 
 ```text
@@ -968,6 +1019,17 @@ The built-in primitive Data types that satisfy `Numeric` are:
 Int
 Float
 ```
+
+Under the `units` feature, `Numeric` is satisfied only by a numeric primitive type whose unit is dimensionless.
+
+```text
+Numeric<Float>      satisfied
+Numeric<Float[1]>   satisfied, since Float[1] is Float (28.5)
+Numeric<Float[s]>   not satisfied
+Numeric<Int[s]>     not satisfied
+```
+
+A generic process constrained by `Numeric` therefore does not accept a unit-annotated value. v0 defines no way to abstract over a unit (28.12), and a process that computed on an arbitrary unit could not state what unit its result has.
 
 `Numeric` is a closed built-in trait in v0. It must not be redeclared in the document's top-level `traits` section, and user-defined types must not implement `Numeric`. `Numeric` may be used only as a generic type constraint over v0 primitive numeric types.
 
@@ -1103,7 +1165,7 @@ types:
         value: 384
 ```
 
-View fields are required, read-only Pure Data projections. In v0, a user-defined view field type must be a v0 primitive Pure Data type or an Array whose element type recursively satisfies the same restriction.
+View fields are required, read-only Pure Data projections. In v0, a user-defined view field type must be a v0 primitive Pure Data type or an Array whose element type recursively satisfies the same restriction. Under the `units` feature the restriction is extended to admit a unit suffix where the base type is `Int` or `Float`, and a static view value is then checked against the base type alone (28.9).
 
 Therefore, the following view field types are valid:
 
@@ -1282,7 +1344,8 @@ Type inference uses structural matching between target process input port types 
 Two kinds of type parameter can occur in one match, and they behave differently. A type parameter declared by the **target** process is **flexible**: instantiating the invocation is what determines it. A type parameter declared by the **enclosing** process — the one whose body contains this invocation — is **rigid**: inside that body it stands for a type that is unknown but already fixed by whoever will instantiate the enclosing process, so nothing here may choose it. A concrete atomic type is a built-in primitive type or a top-level user-defined type.
 
 ```text
-A built-in primitive type matches only the same built-in primitive type.
+A built-in primitive type matches only the same built-in primitive type, which under the
+  units feature means the same base type with an equal unit normal form (28.4).
 A user-defined nominal type matches only the same nominal type.
 Array<X> matches Array<Y> by recursively matching X and Y.
 An unbound flexible parameter matches a concrete atomic type whose domain matches the declared flexible parameter domain.
@@ -1293,6 +1356,8 @@ All other matches fail.
 ```
 
 No subtyping, implicit conversion, trait-based widening, union matching, common-supertype inference, or Array-to-type-parameter binding is performed.
+
+A unit-annotated numeric type is a concrete atomic type of `domain: data`. A flexible parameter of that domain may therefore be instantiated with one, and an already-bound parameter matches only the same base type and unit.
 
 A rigid parameter does not match a concrete atomic type. Inside a generic process whose parameter is `U`, a port of type `U` may hold a value of any type the caller eventually chooses, so binding it to a port that requires one particular concrete type is not sound and is a validation error.
 
@@ -1443,6 +1508,8 @@ The following operator category checks are defined by v0:
 | binary `+`, `-`, `*` | Any numeric pair | `Int` if both operands are `Int`; otherwise `Float` | Numeric pairs are any combination of `Int` and `Float`. |
 | binary `/` | Any numeric pair | `Float` | `Int / Int` produces `Float` in contract expressions. |
 | unary `-` | `Int` or `Float` | Same type as operand | |
+
+When the `units` feature is in effect, operands may carry unit annotations. The unit rules are given in 28.11 and are applied independently of the base-type rules in this table. They do not change which operand pairs this table allows, and they do not change any result base type.
 
 String values support only `==` and `!=`. String ordering and string concatenation are not supported in v0 contract expressions. Mixed numeric operations and comparisons are allowed only by the local numeric promotion rule above.
 
@@ -1624,7 +1691,7 @@ In `branch`, `args` are supplied only to the selected arm. They are not fan-out,
 
 Every binding connects a value to a port. The resolved type of the bound value must **match** the resolved type of the port it is bound to. A binding whose value type does not match its port type is a validation error.
 
-Matching is the structural matching relation defined for generic instantiation (8.1). When neither type contains a type parameter, that relation reduces to identity of type expressions: `Cup` matches only `Cup`, `Array<Cup>` matches only `Array<Cup>`, and `Array<Cup>` does not match `Cup`. v0 performs no subtyping, widening, or implicit conversion at a binding, exactly as it performs none in generic instantiation.
+Matching is the structural matching relation defined for generic instantiation (8.1). When neither type contains a type parameter, that relation reduces to identity of type expressions: `Cup` matches only `Cup`, `Array<Cup>` matches only `Array<Cup>`, and `Array<Cup>` does not match `Cup`. v0 performs no subtyping, widening, or implicit conversion at a binding, exactly as it performs none in generic instantiation. Under the `units` feature, identity of type expressions is identity of base type and unit normal form (28.4), so `Float[mg/mL]` and `Float[mg*mL^-1]` are the same type.
 
 What is compared depends on the binding section:
 
@@ -1658,6 +1725,8 @@ Array<T> the YAML value must be a sequence whose every element conforms to T.
 ```
 
 The acceptance of an integer literal for a `Float` port is the same latitude 7.4 gives a static `Float` view value, and for the same reason: YAML integer, floating-point, and exponent forms all denote a number, and a document should not have to write `3.0` where `3` is meant. It is not a subtyping rule and does not extend to `from` bindings, where an `Int`-typed value does not match a `Float` port.
+
+A literal is interpreted according to the declared type of its target, including its unit annotation when the `units` feature is in effect (28.8). The conformance check above is performed against the base type, so an integer literal fills a `Float[s]` port exactly as it fills a `Float` port.
 
 A literal is a `graph` phase value. `graph` is the least phase (6), so a literal satisfies the phase requirement of every Pure Data position it may be written in, and no phase condition is ever stated for a literal.
 
@@ -3356,7 +3425,7 @@ Implementation extension keys must use the reserved prefix `x-`. Unknown keys th
 
 The v0 core validator does not define the schema or semantics of `x-` extension values. YAML well-formedness, string-key restrictions, duplicate-key restrictions, and import expansion still apply to extension keys and their values.
 
-The `scheduling.policies[*].prefer` payload has a v0-defined closed shape for v0-defined scheduling preference kinds. v0 core validation checks scheduling placement, temporal references, Object targets, Object lifetime interpretation, feature requirements, preference kind names, required preference payload fields, and the scalar shape of preference values and units. Unit strings and unit conversion semantics are implementation-defined. Extension preference kinds and extension payload fields are allowed only in extension-tolerant mode when they use the reserved `x-` prefix.
+The `scheduling.policies[*].prefer` payload has a v0-defined closed shape for v0-defined scheduling preference kinds. v0 core validation checks scheduling placement, temporal references, Object targets, Object lifetime interpretation, feature requirements, preference kind names, required preference payload fields, and the scalar shape of preference values and units. The `unit` strings of those payloads, and their conversion semantics, are implementation-defined. They are unrelated to the unit expressions of 28. Extension preference kinds and extension payload fields are allowed only in extension-tolerant mode when they use the reserved `x-` prefix.
 
 A feature name listed in `features` must be either a v0-defined feature name or, in extension-tolerant mode, an implementation-defined extension feature name using the form:
 
@@ -3379,12 +3448,13 @@ Implementations may report validation, portability, unsupported-feature, and ext
 1. A process's input and output endpoints are collectively called ports; input ports are declared under `inputs`, and output ports are declared under `outputs`.
 2. A v0 document may include optional reserved `spec_version` metadata naming the revision it is written against. If present, it must use the two-number string format `MAJOR.MINOR`; omission is allowed. It does not select an interpretation -- a document is read by the rules of the revision the implementation implements -- but an implementation refuses a later MINOR of the same MAJOR, and any other MAJOR, rather than answer for a revision it does not implement (2.1).
 3. Types are nominal; built-in primitive Data types are `Bool`, `Int`, `Float`, and `String`, and the only built-in type constructor is `Array<T>`.
+3a. Under the `units` feature (28), `Int` and `Float` may carry a unit suffix, which is part of the type: two numeric types with different unit normal forms are different types. Unit atoms are opaque names in their own namespace and must be declared in the top-level `units` section; `Float[1]` is `Float`. No other type may carry a unit suffix.
 4. `$import` provides structural inclusion before validation; it is not a module system and introduces no namespace or aliasing. Import paths should be relative for portability; URI-scheme references are implementation extensions, and URI fragments are not defined in v0.
 5. Imported fragments normally omit reserved metadata; duplicate keys at the same expanded mapping level after import resolution are validation errors.
-6. v0 portable YAML is closed by default; unknown keys are validation errors. Scheduling preference payloads have a v0-defined closed shape for v0-defined preference kinds, while unit strings are implementation-defined.
+6. v0 portable YAML is closed by default; unknown keys are validation errors. Scheduling preference payloads have a v0-defined closed shape for v0-defined preference kinds, while the `unit` strings inside them are implementation-defined and are unrelated to the unit expressions of 28.
 7. Implementation extension keys must use the `x-` prefix and are not strict portable v0 unless explicitly accepted by an extension-tolerant validator mode.
 8. `null` values are not valid in v0 portable YAML.
-9. Omitted `traits`, `types`, `inputs`, and `outputs` are interpreted as empty mappings; `features` may be omitted and derived; `processes` is required.
+9. Omitted `units`, `traits`, `types`, `inputs`, and `outputs` are interpreted as empty mappings; `features` may be omitted and derived; `processes` is required.
 10. v0 identifiers are case-sensitive ASCII identifiers matching `[A-Za-z_][A-Za-z0-9_]*`; `.` is not allowed in identifiers, including process names.
 10a. Within one composite body, node ids are unique. Two nodes with the same `id` are a validation error, since `<node_id>.<output>` would then not name one value.
 11. UTF-8 text is allowed in YAML string values and comments, but not in identifiers.
@@ -3430,16 +3500,18 @@ Implementations may report validation, portability, unsupported-feature, and ext
 42. Python script code returns an output-name mapping; `script.returns` is not defined in v0.
 43. Script return mismatches are runtime verification errors unless statically determined.
 44. `scheduling_policies` covers scheduling policy attachment, including scalar Object and Object-bearing collection targets.
-45. Scheduling policies are preferences; policy misses and conflicting preferences are not validation errors. v0 defines the portable `prefer` payload shape for `max_gap`, `min_gap`, and `temperature`; unit strings and conversion semantics are implementation-defined. `max_gap` and `min_gap` forbid `object` and require finite non-negative numeric values. `temperature` requires a finite numeric value and requires an `object` target.
+45. Scheduling policies are preferences; policy misses and conflicting preferences are not validation errors. v0 defines the portable `prefer` payload shape for `max_gap`, `min_gap`, and `temperature`; the `unit` strings of those payloads and their conversion semantics are implementation-defined, and are unrelated to the unit expressions of 28. `max_gap` and `min_gap` forbid `object` and require finite non-negative numeric values. `temperature` requires a finite numeric value and requires an `object` target.
 46. `scheduling` is allowed only on composite processes, and temporal references are lexically scoped to the current composite body.
 47. Policies do not apply retroactively to Objects before they become reachable from the declaring scope, but once a policy applies to an Object identity, it follows that identity through identity-preserving flow into nested composite and structured node executions.
 48. Policies declared in inner scopes are not exported to callers, and policies do not transfer across `consume` / `create` replacement in v0.
 49. Runtime failure and exception handling are outside v0.
 50. v0 defines one closed built-in type trait, `Numeric`, satisfied only by `Int` and `Float`; document-defined type traits are declared in top-level `traits`.
+50a. `Numeric` is satisfied only by a numeric primitive type whose unit is dimensionless, so a generic process constrained by `Numeric` does not accept a unit-annotated value.
 51. Document-defined type traits are nominal membership markers only and do not imply fields, operators, conversions, subtyping, inheritance, Object behavior, or view structure; user-defined types cannot implement `Numeric`.
 52. User-defined types implement traits using `implements`.
 53. User-defined type views are declared in `types.*.view`; view fields are required, read-only Pure Data projections.
 54. In v0, user-defined view field types must be primitive Pure Data types or Arrays recursively containing only primitive Pure Data element types.
+54a. A view field type may carry a unit suffix where its base type is `Int` or `Float`. A static view value is checked against the base type; the declared unit is the unit of that value.
 55. User-defined nominal Data types, Object types, Arrays of user-defined nominal Data types, and Arrays of Object types are not valid user-defined view field types.
 56. A user-defined view field may declare an optional static `value`; if present, it is a graph-time type-level constant that must conform to the field's declared view field type.
 57. Static view values must not be `null`; Float static values may use YAML integer, floating-point, or exponent numeric forms, but NaN and infinity are not valid portable v0 static values. This constrains the type-level constant only, not the Float values a workflow produces at run time.
@@ -3467,11 +3539,13 @@ Implementations may report validation, portability, unsupported-feature, and ext
 79. Contract `expr` values are YAML string scalars using the v0 contract expression language. Contract references must explicitly include `.view`; direct port references and omitted `.view` are not valid v0 contract references.
 80. Contract expression Float literals may use decimal exponent notation such as `1.0e+23`; integer exponent notation such as `1e3` is not a v0 Float literal.
 81. Contract expressions must type-check to `Bool`; all subexpressions are parsed and type-checked without relying on Boolean short-circuiting to ignore invalid subexpressions.
+81a. Contract expression unit rules are applied to each subexpression independently of base-type promotion: `*` and `/` compose units, while binary `+`, `-` and the comparisons require equal unit normal forms. A subexpression whose every leaf is a numeric literal carries no unit and is read in the unit of the operand it is compared or added to. A unit mismatch in a contract expression is a validation error, not a runtime contract violation.
 82. Strict portable v0 uses only v0-defined syntax, keys, feature names, type syntax, process kinds, node kinds, script languages, and validation semantics.
 83. Extension-tolerant mode may accept `x-` extension keys and `x-` extension feature names, but unknown non-`x-` keys remain validation errors.
 84. v0 core validation does not accept implementation-defined type constructors, process kinds, node kinds, Object transform kinds, binding sections, output modes, or alternate generic inference semantics; such changes define an extended dialect.
 85. A v0 document may include optional human-readable `description` metadata at the document root and at trait, type, and process definitions. `description` must be a YAML string scalar, is not a reserved identifier name, and does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling, or runtime behavior.
 86. The resolved type of a bound value must match the resolved type of the port it is bound to, in every binding section and in `body.returns`. Matching is the structural matching relation of generic instantiation, which reduces to identity of type expressions when no type parameter is involved. An `each` source must be an Array, and it is its element type that is matched against the target input port.
+86a. Binding type match includes the unit: a unit is never added, removed, or converted implicitly, at a binding, a constant slot, a carry, a structured node output, or a generic instantiation. Unit conversion is written as an ordinary atomic process, whose numeric correctness the IR does not check.
 87. A literal binding source (`value`) must conform to its port's declared type, checked exactly as a static view value is checked against a view field type; an integer literal is accepted for a `Float` port. A literal must not be bound to an Object-bearing port.
 87a. A literal is a `graph` phase value, the least phase, so it satisfies the phase requirement of every Pure Data position it may be written in.
 88. Structural matching distinguishes a flexible type parameter (declared by the target process, determined by instantiation) from a rigid one (declared by the enclosing process, already fixed). A flexible parameter may be inferred to be a rigid parameter of matching domain; a rigid parameter matches only itself and never a concrete type. A `where` constraint whose parameter was inferred to a rigid parameter is satisfied only if the enclosing process declares that same constraint over it.
@@ -3479,3 +3553,338 @@ Implementations may report validation, portability, unsupported-feature, and ext
 90. Such a reference is instead resolved at each invocation that instantiates the process, by substituting that invocation's inferred type arguments into the target's port types and checking the expression against the resolved types. An invocation resolves only the type arguments it infers itself: where a type argument is a type parameter of the enclosing process, or where inference determined none, the contract is not checked at that invocation. A `where` constraint does not make a view field decidable, because a trait declares no field.
 91. View field names must match the v0 identifier grammar and must not contain `.`, but they are not subject to the reserved-name list: a view field name is only ever an outer key in a view schema or the single segment after `.view` in a contract reference, so it cannot be confused with a structural key.
 92. Where a validation error names a condition classified by the phase at which it is determined, the obligation is conditional on the implementation determining it at that phase. v0 requires no static inference of Array or traversal lengths, so an implementation that establishes emptiness or a length mismatch only at run or data phase reports it there, and not reporting it as a validation error is correct.
+
+---
+
+## 28. Feature: `units`
+
+`units` is an **experimental** feature (4.5). It enables unit annotations on the built-in numeric primitive types.
+
+A unit annotation is part of the type. Two values whose types differ only in their unit annotation have different types, and every rule in this specification that requires two types to be the same therefore requires their unit annotations to agree.
+
+v0 defines no unit registry, no physical dimensions, and no scale relationships between units. A unit atom is an opaque name. The specification does not know that `s` denotes a second, that `min` and `s` measure the same physical quantity, or that one is sixty times the other.
+
+All checks defined by this feature are performed at graph phase. No unit condition is classified as a run-start or runtime data error under 6.2.
+
+A unit has no runtime representation. Two values whose types differ only in their unit annotation are represented identically, and no operation of a workflow reads a unit, so an implementation may discard every unit annotation once graph validation has succeeded and hand the execution layer the same document it would have received with no unit written in it. What a unit constrains is which documents are valid, not what a run does.
+
+### 28.1 Unit declarations
+
+Every unit atom used in a document must be declared in the top-level `units` section.
+
+```yaml
+units:
+  s: {}
+  min: {}
+  uL: {}
+  mL: {}
+  mg: {}
+```
+
+A `units` declaration is a mapping from unit atom names to declaration bodies. In v0 the only valid declaration body is an empty mapping. A unit atom is a nominal name and nothing more: a declaration carries no dimension, no scale, no relationship to any other unit atom, and no conversion behaviour. A `units` entry whose value is not an empty mapping is a validation error.
+
+A unit atom name must match `UnitIdent` (28.2). A name that does not, including a name a YAML processor represents as a scalar other than a string, is a validation error. Duplicate names within `units` are validation errors.
+
+A unit atom appearing in a unit expression that is not declared in `units` is a validation error. This applies to unit expressions in port types, in constant slot types, in view field types, and anywhere else a type expression may appear.
+
+This requirement exists so that a misspelled unit is reported where it is written, rather than only when the misspelled value is connected to something. `Float[sec]` in a document that declares `s` but not `sec` is a validation error at the point of use.
+
+The dimensionless unit is written `1` (28.2) and is not a unit atom. It is not declared, and `1` is not a valid unit atom name.
+
+Unit atom names occupy their own namespace. A unit atom name may coincide with a type name, a trait name, a process name, or a port name without conflict, and the reserved names of 2.4 do not apply to unit atom names.
+
+An omitted `units` section is interpreted as an empty mapping (2.3), in which case no unit expression other than `1` can be written. A `units` section may be assembled through `$import` under the ordinary shallow structural merge rules of 3.2, which is the intended way to share a unit vocabulary across documents. 28.13 states what that costs.
+
+### 28.2 Unit suffix syntax
+
+A type expression may carry a unit suffix. The grammar of 2.5 becomes:
+
+```text
+TypeExpr      ::= TypeAtom UnitSuffix? | ArrayType
+ArrayType     ::= "Array" "<" S? TypeExpr S? ">"
+TypeAtom      ::= Identifier
+Identifier    ::= [A-Za-z_][A-Za-z0-9_]*
+S             ::= one or more ASCII space or tab characters
+
+UnitSuffix    ::= "[" UnitExpr "]"
+UnitExpr      ::= "1" | UnitTerm (("*" | "/") UnitTerm)*
+UnitTerm      ::= UnitIdent Exponent?
+Exponent      ::= "^" "-"? [1-9][0-9]*
+UnitIdent     ::= [A-Za-z_][A-Za-z0-9_]*
+```
+
+Whitespace is not allowed anywhere inside a unit suffix, including immediately inside the brackets, and none is allowed between a type atom and its suffix. The whitespace rule of 2.5 is unchanged elsewhere, so `Array< Float[uL] >` is valid and `Float[mg / mL]` is not.
+
+`*` and `/` are left-associative and have equal precedence, so `a/b*c` is `(a/b)*c`. Parentheses are not part of v0 unit expression syntax. An expression that cannot be written without parentheses must be written using explicit exponents.
+
+`1` denotes the dimensionless unit and may appear only as the whole unit expression.
+
+Valid unit suffixes:
+
+```text
+Float[s]
+Float[uL]
+Float[mg/mL]
+Float[m*s^-2]
+Float[1]
+Int[count_]
+Array<Float[mg/mL]>
+```
+
+Invalid unit suffixes:
+
+```text
+Float[mg / mL]     whitespace
+Float [s]          whitespace before the suffix
+Float[2s]          a unit atom must not begin with a digit
+Float[s^0]         an exponent is a nonzero decimal without a leading zero
+Float[1*s]         1 may appear only as the whole unit expression
+Float[%]           % is not an identifier character
+```
+
+`Float[v/v]` is well-formed but denotes `v` divided by `v`, which normalizes to the dimensionless unit (28.3). See 28.13.
+
+A unit suffix may be attached only to the built-in numeric primitive types `Int` and `Float`. A unit suffix on `Bool`, on `String`, on a user-defined nominal type, on `Array`, or on a type parameter is a validation error.
+
+A unit suffix is written on the element type, not on the Array: `Array<Float[uL]>` is an Array of microlitre values. `Array[uL]<Float>` is not v0 syntax.
+
+### 28.3 Normal form
+
+A unit expression denotes a mapping from unit atoms to nonzero integer exponents. The normal form is computed as follows.
+
+1. Expand the expression into atom/exponent pairs. A `UnitTerm` without an explicit exponent has exponent 1. A term on the right of `/` has its exponent negated. The expression `1` expands to no pairs.
+2. Sum the exponents of equal atom names.
+3. Remove every atom whose summed exponent is zero.
+4. Sort the remaining atoms by atom name in ASCII order.
+
+If the result is empty, the unit expression is **dimensionless**.
+
+The canonical written form of a normal form joins the sorted atoms with `*`, writes each exponent with `^` unless it is 1, and writes `1` for the empty result. Implementations should use this form in diagnostics. It is not required in documents.
+
+```text
+mg/mL          normalizes to   mL^-1*mg
+mg*mL^-1       normalizes to   mL^-1*mg
+m*s^-2         normalizes to   m*s^-2
+s/s            normalizes to   1
+uL/mL          normalizes to   mL^-1*uL
+```
+
+Note that `uL/mL` is **not** dimensionless in v0. Because unit atoms are opaque, the specification does not know that `uL` and `mL` measure the same quantity, and the exponents of two distinct atoms do not cancel.
+
+### 28.4 Type identity
+
+Two type expressions denote the same type when their base types are the same and their unit normal forms are equal.
+
+```text
+Float[mg/mL]    ==  Float[mg*mL^-1]     same normal form
+Float[uL]       !=  Float[mL]           distinct atoms
+Float[mg/mL]    !=  Float[g/L]          distinct atoms
+Float[s]        !=  Int[s]              distinct base types
+Float[s]        !=  Float[s^2]          distinct exponents
+```
+
+### 28.5 Absence of a unit suffix
+
+A numeric type written without a unit suffix is the same type as the same numeric type annotated with a dimensionless unit expression.
+
+```text
+Float    ==  Float[1]    ==  Float[s/s]
+Int      ==  Int[1]
+```
+
+`Float` is not "a Float whose unit is unknown". It is a Float whose unit is dimensionless. Consequently:
+
+```text
+Float[s]  !=  Float
+```
+
+and neither direction connects. Binding a `Float[s]` value to a `Float` input port is a validation error, and binding a `Float` value to a `Float[s]` input port is a validation error. A unit is never added or removed implicitly.
+
+### 28.6 No implicit conversion
+
+v0 defines no conversion between units. `Float[min]` and `Float[s]` are unrelated types, as are `Float[uL]` and `Float[mL]`.
+
+Unit conversion, adding a unit to an unannotated value, and removing a unit are written as ordinary atomic processes:
+
+```yaml
+processes:
+  min_to_s:
+    kind: atomic
+    inputs:
+      x:
+        type: Float[min]
+        phase: data
+    outputs:
+      y:
+        type: Float[s]
+        phase: data
+
+  as_seconds:
+    kind: atomic
+    inputs:
+      x:
+        type: Float
+        phase: data
+    outputs:
+      y:
+        type: Float[s]
+        phase: data
+```
+
+The numeric correctness of such a process is not checked by the IR. As with `objects.map` (14.1), the declaration is trusted. An implementation that multiplies by the wrong factor has an implementation correctness problem, not an IR validation error.
+
+These processes are the intended way to connect a unit-annotated document to an `$import`ed library whose ports are unannotated. Because they appear as nodes, every point at which a unit is introduced or discarded is visible in the document.
+
+Such a process is an ordinary atomic process at run time. Because a unit has no runtime representation, a conversion process is the one place where a unit change has a numeric consequence, and that consequence is the process's own implementation rather than anything the IR expresses.
+
+### 28.7 Ports, bindings, and structured nodes
+
+The unit annotation participates in type identity (28.4) and therefore requires no additional rules in the following places. The listed rules apply unchanged.
+
+- Binding type compatibility (11.1): a `bind`, `state`, `carry`, `args`, `each`, or `returns` source must have the type of what it is bound to, including its unit. For an `each` source it is the element type that is matched, so traversing `Array<Float[s]>` binds `Float[s]`.
+- Constant slots (11.2): a slot type is a type expression, so a slot of type `Int` is a slot of `Int[1]`. `do_while.max_iterations` has slot type `Int` (19), so a unit-annotated value does not fill it.
+- Structured carry compatibility (16): a carry output must have the same name, type, and phase, and the type includes the unit.
+- Structured node outputs (17, 18.1, 19.1, 20.1, summarized in 21): a `map` target output `p: Float[s]` is exposed as `p: Array<Float[s]>`, a collected `fold` or `do_while` output likewise, and a `branch` common output must have the same type in both arms, including its unit.
+- Generic instantiation (8.1): structural matching compares base type and unit normal form. A unit-annotated numeric type is a concrete atomic type of `domain: data`, so a `domain: data` type parameter may be instantiated with one. `Float[s]` and `Float[m]` matched against the same type parameter is a validation error, as any two distinct concrete types would be.
+
+The feature does not interact with Object tracking. A unit suffix may be attached only to the numeric primitive types, which have no Object slots (5.2), so an Object skeleton (12.4) never mentions a unit. Linearity (12.2), Object tracking completeness (13), the `objects` section (14) -- whose every path must name an Object-bearing port -- the `object_identity_map` marker (15), and Object policy targets (24) are all unaffected.
+
+The `unit` string in a `scheduling.policies[*].prefer` payload (23.4) is a separate, implementation-defined string. It is unrelated to the unit expressions defined here and is not validated against them.
+
+### 28.8 Literals
+
+A numeric literal written under `value` has no unit of its own. It is interpreted according to the type of the port or constant slot it fills.
+
+```yaml
+bind:
+  duration:
+    value: 30        # 30 seconds, if the target port is Float[s]
+```
+
+This is the existing rule that a literal is checked against the declared type of its target (11.1.1), extended to cover the unit. A literal is checked against the **base type**: the latitude 11.1.1 gives an integer literal filling a `Float` port is unchanged by the presence of a unit, so `value: 30` fills a `Float[s]` port.
+
+A literal determines no type argument (8.1), so a literal bound to a port whose type is a bare type parameter remains a validation error in v0.
+
+### 28.9 View fields and static view values
+
+A view field type may carry a unit suffix. The restriction of 7.4 is extended: a view field type must be a v0 primitive Pure Data type, optionally unit-annotated where the base type is `Int` or `Float`, or an Array whose element type recursively satisfies the same restriction.
+
+```yaml
+types:
+  Plate96:
+    domain: object
+    view:
+      well_count:
+        type: Int
+        value: 96
+      well_volume:
+        type: Float[uL]
+        value: 200
+```
+
+A static view value is checked against the **base type** by the rules of 7.4. The unit suffix does not affect that check. The declared unit is the unit of the static value.
+
+### 28.10 Disabling unit checking
+
+An implementation may offer a diagnostic validation mode in which unit checking is disabled. In that mode the document is validated as if every unit suffix had been removed from every type expression, as if the `units` section were empty, and as if the contract expression rules of 28.11 were not in effect.
+
+The transformation only merges type distinctions; it never introduces one. Every document rejected with unit checking disabled is also rejected with it enabled. The mode is therefore useful for determining whether a validation failure has a cause other than units.
+
+Four conditions apply.
+
+1. The implementation must report that the mode was used.
+2. Acceptance in that mode does not mean the document is a valid v0 document. The mode is not a conformance criterion.
+3. The meaning of a document is always the meaning it has when the feature is enabled.
+4. The implementation must not emit, as a canonical or normalized form, a document from which unit suffixes or the `units` section have been removed.
+
+### 28.11 Contract expressions
+
+Unit checking in contract expressions is performed on the type of each subexpression. Base-type rules are unchanged from 9.2; unit rules are applied independently and do not affect base-type promotion.
+
+Every subexpression is one of two kinds. A **literal expression** is a subexpression whose every leaf is a numeric literal: a numeric literal itself, a unary `-` applied to a literal expression, and any `+`, `-`, `*`, or `/` applied to two literal expressions. A literal expression carries no unit. Every other subexpression is **unit-bearing** and has a unit normal form; a `Bool` or `String` subexpression is unit-bearing and dimensionless.
+
+| Operator | Unit rule | Unit of result |
+|---|---|---|
+| `*` | none | sum of the operand exponents, a literal expression contributing none |
+| `/` | none | left exponents minus right exponents, a literal expression contributing none |
+| `+`, `-` (binary) | if both operands are unit-bearing, their normal forms must be equal | the unit-bearing operand's unit |
+| `==`, `!=`, `<`, `<=`, `>`, `>=` | if both operands are unit-bearing, their normal forms must be equal | `Bool` |
+| unary `-` | none | same as operand |
+| `and`, `or`, `not` | operands are `Bool`, which is dimensionless | `Bool` |
+
+Where one operand of a binary `+`, `-`, or comparison is a literal expression, no unit condition is imposed: the literal expression is interpreted in the unit of the other operand, exactly as a literal filling a port is interpreted in the unit of that port (28.8). Where both operands are literal expressions, the result is a literal expression.
+
+Base-type promotion and unit composition are orthogonal:
+
+```text
+Float[uL] * Int          base Float, unit uL          -> Float[uL]
+Int[s]    + Int[s]       base Int,   unit s           -> Int[s]
+Float[uL] / Float[uL]    base Float, unit 1           -> Float
+Int[mL]   / Int[s]       base Float, unit mL/s        -> Float[mL/s]
+Float[s]  >= -30.0       the literal expression is read in s
+Float[s]  >  1.0 + 2.0   the literal expression is read in s
+```
+
+```yaml
+contracts:
+  requires:
+    - expr: "inputs.volume.view >= 200.0"
+    - expr: "inputs.volume.view * inputs.concentration.view <= inputs.max_mass.view"
+    - expr: "inputs.volume.view <= inputs.plate.view.well_volume"
+```
+
+In the second expression, if `volume` is `Float[mL]` and `concentration` is `Float[mg/mL]`, the product has unit `mg`, and `max_mass` must be `Float[mg]`. If `volume` were `Float[uL]`, the product would have unit `mL^-1*mg*uL` and the comparison would be a validation error, because v0 does not know that `uL` and `mL` are related.
+
+A unit mismatch in a contract expression is a validation error, not a runtime contract violation.
+
+Where a contract reference resolves through a port whose declared type is a type parameter, the expression is resolved at each invocation that instantiates the process (9.1), and the unit rules of this section are applied to the resolved types there.
+
+### 28.12 Unit suffixes and type parameters
+
+A unit suffix contains a unit expression, never a type expression. A type parameter name appearing inside a unit suffix is resolved as a unit atom name, and is a validation error unless an atom of that name is declared in `units`. A type parameter is never given a unit suffix (28.2), and v0 defines no way to abstract over a unit.
+
+### 28.13 Guidance (non-normative)
+
+Because unit atoms are opaque and no registry exists, two spellings of the same unit are two different units. A document that declares both `s` and `sec` will accept both, and `Float[s]` and `Float[sec]` will not connect. Authors should adopt a single spelling convention and place it in a file imported by every document in a project.
+
+Suggested ASCII spellings, chosen to be forward-compatible with a possible future registry:
+
+```text
+time            s  min  h  d  ms  us
+volume          L  mL  uL  nL
+mass            g  mg  ug  ng  kg
+amount          mol  mmol  umol  nmol
+concentration   mg/mL  ug/mL  mol/L  mmol/L
+temperature     degC  K
+length          m  mm  um  nm
+rotation        rpm
+centrifugation  xg
+ratio           pct  vv  wv
+```
+
+A ratio must not be written as a quotient of one atom by itself: it parses as a quotient and normalizes to `1`. Write `vv`.
+
+A shared vocabulary file pairs naturally with the conversion processes of 28.6, since both are project-wide and neither is checked by the specification:
+
+```yaml
+# units_common.yaml
+units:
+  s: {}
+  min: {}
+  h: {}
+  uL: {}
+  mL: {}
+  L: {}
+
+processes:
+  min_to_s:
+    kind: atomic
+    inputs:
+      x: { type: Float[min], phase: data }
+    outputs:
+      y: { type: Float[s], phase: data }
+```
+
+Because a unit conversion process is not checked by the IR, such processes should be written once in a file of this kind and imported, rather than repeated.
+
+**A vocabulary is imported once.** `$import` is structural inclusion, not a module system (3), and duplicate keys after import resolution are validation errors even where the two declarations are identical (3.2). A unit vocabulary must therefore reach a document by exactly one import path: a document that imports the vocabulary directly must not also import a library that imports it. This is a property of `$import` that `traits` and `types` share, and 28.1's declaration requirement makes it unavoidable for `units`. The practical arrangement is a single vocabulary file imported only by the top document, with library files declaring unit-annotated ports and leaving the atoms to their importer.

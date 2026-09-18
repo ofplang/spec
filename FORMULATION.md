@@ -79,7 +79,7 @@ Proposition I-1, Corollary I-2   the faithfulness triangle   11
 their validity.
 
 ```
-contract expressions          spec 9, spec 27 rules 79-81
+contract expressions          spec 9, spec 28.11, spec 27 rules 79-81, 81a
 view schemas                  spec 7, spec 27 rules 50-58
 scheduling policies           spec 23-24, spec 27 rules 44-48
 portability and extensions    spec 26, spec 27 rules 82-84
@@ -204,6 +204,8 @@ Class A, keyed to the summary rules of spec 27 where one applies.
 63-67, 88                        generics, rigid and flexible parameters
 68, 69, 72, 73                   references
 86, 87, 87a                      binding type match, literals
+3a, 86a                          unit annotations; unit identity in a binding
+                                 and in generic instantiation
 spec 12.1, 12.2, 12.4            degrees, skeleton
 ```
 
@@ -211,6 +213,7 @@ Class B.
 
 ```
 2, 4, 5, 6, 8, 9, 10, 10a, 11, 60  document shape, imports, identifiers, type syntax
+spec 28.1, 28.2                  the units section; unit suffix syntax
 12, 13                           features
 17                               state is Object-bearing, bind is Pure Data
 41, 42                           script processes
@@ -225,7 +228,7 @@ spec 22                          script outputs are phase: data
 Class C.
 
 ```
-7, 35, 43, 44-48, 50-58, 70, 71, 74, 75, 79-84, 89-91
+7, 35, 43, 44-48, 50-58, 54a, 70, 71, 74, 75, 79-84, 81a, 89-91
 ```
 
 Four of the summary rules state no validity condition and fall outside the classification.
@@ -309,9 +312,32 @@ A^o    the Object-bearing part of A
 ### 4.1 Types and phases
 
 ```
-tau ::= Bool | Int | Float | String | N | Array<tau>
+tau ::= Bool | Int[u] | Float[u] | String | N | Array<tau>
 pi  ::= graph | run | data
+u   : Atom -> Z \ {0}, finitely supported
 ```
+
+`u` is a unit (spec 28.3): a finitely supported map from opaque atoms to nonzero integers,
+that is, an element of the free abelian group over `Atom`. `Int` abbreviates `Int[0]` and
+`Float` abbreviates `Float[0]`, writing `0` for the empty map, so a document that uses no
+unit suffix denotes the same `tau` as before. Equality of `tau` is equality of `u`, which
+is spec 28.4. The `units` section is consumed when a signature is resolved and does not
+appear in core, as `traits` does not.
+
+`u` is invisible to `pure` and `depth`: a unit may occur only on `Int` and `Float`, both
+`pure` with no Object atom, so every skeleton result below is unaffected by it.
+
+`u` is also invisible to the interpretation of section 9: a unit contributes no
+structure to a value, so
+
+```
+[[Int[u]]] = [[Int]]     and     [[Float[u]]] = [[Float]]     for every u
+```
+
+and the evaluation rules of section 10 never read one. A unit is therefore a condition
+on which documents type, not on what a run denotes -- which is what lets an
+implementation hand the execution layer a document with every unit annotation removed
+(spec 28).
 
 `N` is a nominal type; the signature gives its `domain` (spec 5.1). There are no type
 parameters: `D2` monomorphizes.
@@ -1007,6 +1033,10 @@ match(T, tau', theta) = theta
 `M-VAR-NEW` requires `tau'` atomic, which is spec 8's rule that a type parameter is never
 instantiated with an `Array`. No subtyping, no implicit conversion, no relaxation by trait, no
 inference of a common supertype (spec 8.1).
+
+A primitive type carries its unit, so `M-PRIM` requires equal units and `M-VAR-NEW`
+instantiates a parameter with a unit-annotated primitive as with any other atomic type.
+This is spec 28.7's claim that generic instantiation needs no additional rule.
 
 Spec 8.1 also distinguishes a **flexible** parameter (declared by the target) from a **rigid**
 one (declared by the enclosing process), and requires that a constraint on a rigid parameter be
@@ -1991,7 +2021,14 @@ involved, so a document not using the feature is judged as before. Hence:
 > Where a feature generalizes a relation an existing rule refers to, conservativity is kept if
 > the generalization reduces to the original relation in the feature's absence.
 
-The seven features of spec 4.2 all satisfy the guideline, so Proposition 6 holds unconditionally.
+`units` is the second feature to rely on this refinement. It generalizes type identity,
+which spec 11.1, spec 16 and spec 8.1 all refer to, into identity of base type and unit
+normal form. In the absence of a unit suffix every numeric type is dimensionless, so the
+generalized relation is the original one, and no rule, default or global condition
+changes.
+
+The eight features of spec 4.2 all satisfy the guideline, so Proposition 6 holds
+unconditionally.
 
 ### 15.10 Proposition 8: cost
 

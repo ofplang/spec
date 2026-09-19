@@ -7,11 +7,26 @@ This file records what changed and what a document written against the previous
 revision has to do about it. Why a rule is the way it is belongs in the
 specification itself.
 
-## 0.3 (unreleased)
+## 0.3 - 2026-09-19
 
 ### Added
 
-- **28 Feature: `units`**, an experimental feature (4.5) that annotates `Int`
+- **4.5 Experimental features**, the category a feature belongs to when its
+  specification may be changed or removed in a later revision of v0 without a
+  migration path. An experimental feature is an ordinary feature for the
+  purposes of 4.1 through 4.4 -- declared in `features`, derived from the body,
+  subject to 4.4 where an implementation lacks it -- and the marking adds two
+  things: that stability disclaimer, and a recommendation that an implementation
+  report the requirement so an author notices one introduced through `$import`.
+  A feature's own section may define a diagnostic validation mode in which
+  checking for it is disabled; what disabling means is that section's to say.
+  It changes no rule of 4.1 through 4.4.
+
+  This is what the revision is for. A feature still being worked out has
+  nowhere to live under the stability a v0 feature otherwise carries, and the
+  choice without the category is between shipping nothing and promising what
+  will not hold.
+- **28 Feature: `units`**, the first experimental feature (4.5), annotating `Int`
   and `Float` with a unit. A unit is part of the type, so every rule that
   requires two types to be the same requires their units to agree, and 11.1,
   16, 8.1 and the structured node output rules need no addition of their own.
@@ -23,10 +38,6 @@ specification itself.
   validation has succeeded. Also **4.2**, **4.3**, **4.4**, **2**, **2.2**,
   **2.3**, **2.4**, **2.5**, **7.1**, **7.3**, **7.4**, **8.1**, **9.2**,
   **11.1**, **11.1.1**, and **27 rules 3a, 50a, 54a, 81a, 86a**.
-- **4.5 Experimental features**, the category an experimental feature belongs
-  to. It adds a stability disclaimer and a diagnostics recommendation to 4.1
-  through 4.4, and permits a feature's own section to define a diagnostic
-  validation mode. It changes no rule of 4.1 through 4.4.
 
 ### Changed
 

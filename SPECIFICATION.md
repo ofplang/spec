@@ -1,10 +1,12 @@
 # Object-flow Programming Language v0 Specification
 
-Revision: 0.3 (draft)  
-Date: unreleased  
-Supersedes: revision 0.2 (2026-09-17), released and tagged `v0.2`. CHANGELOG.md records what changed and what a document written against 0.2 has to do about it.
+Revision: 0.3  
+Date: 2026-09-19  
+Supersedes: revision 0.2 (2026-09-17). CHANGELOG.md records what changed and what a document written against 0.2 has to do about it. A 0.2 document stays valid unless it used the name `units`, which this revision reserves.
 
-A document names the revision it is written against with `spec_version` (2.1). This revision is open and states no change of its own yet, so it holds the rules of 0.2 and a 0.2 document is a valid document under it.
+A document names the revision it is written against with `spec_version` (2.1). This revision introduces the category of **experimental features** (4.5): a v0 feature whose specification may be changed or removed in a later revision without a migration path, where a feature outside the category would be given one. Stability is what an author relies on when they write against a revision, so a feature still being worked out needs somewhere to live that says so. Without such a place the choice is between shipping nothing and making a promise about to be broken.
+
+The category has its first member in the same revision. `units` (28) annotates `Int` and `Float` with a unit, which is part of the type: every rule that requires two types to be the same then requires their units to agree, so the binding match, carry compatibility, structured node outputs and generic instantiation need no rule of their own. Unit atoms are opaque names declared in a top-level `units` section; v0 defines no registry, no dimensions and no conversion, so a conversion is an ordinary atomic process whose arithmetic the IR trusts. Every condition the feature states is decided at graph phase, and a unit has no runtime representation, so an implementation may discard every annotation once validation has succeeded.
 
 Revision 0.2 stated four conditions that 0.1 relied on without stating: node ids are unique within a body, a body's node dependency graph is acyclic, a value flows only into an equal-or-later phase, and a literal is a `graph` phase value. It also named the kind of position `max_iterations` occupies, a constant slot (11.2), and corrected 1.1's upper bound on the physical resources a workflow needs, which holds only under a condition 1.1 did not state.
 

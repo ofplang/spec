@@ -42,6 +42,7 @@ validator or a runner implements those rules correctly is a separate question.
 | Lemma 9 (lifting agrees) | proved |
 | Proposition 2a, 2b (conservation) | proved |
 | Proposition 2c (conservation on traces) | proved, assuming faithfulness |
+| Corollary 2d (one origin, one end) | proved |
 | Proposition 3 (schedule independence) | proved, assuming faithfulness |
 | Proposition 4 (orthogonality of annotations) | proved |
 | Proposition 6 (conservativity of features) | proved |
@@ -1863,6 +1864,35 @@ position. []
 
 **Both kinds inducing bijections is what makes conservation work**, and it holds because no v0
 correspondence splits a port (Lemma 0).
+
+### 15.4.1 Corollary 2d: one origin, one end
+
+> In a body that types, follow the correspondences of its nodes' skeletons from Object slot to
+> Object slot. Every chain so formed has exactly one origin -- an Object-bearing input of the
+> body, or a slot some node's skeleton creates -- and exactly one end -- a slot some node's
+> skeleton consumes, or an Object-bearing output of the body.
+
+*Proof.* Each Object-bearing variable of the body is used exactly once (the splitting of the LET
+rules, 7.4) and the body's outputs take what remains exactly (`RETURN`, 7.3). So every slot a
+node produces is read by exactly one node or returned, and every slot a node reads was produced
+by exactly one node or is an input of the body. Within a node, its skeleton is complete (2a, or
+the signature for an atomic process), so each input slot is in exactly one of `dom(mu)` and `C`,
+and each output slot in exactly one of `im(mu)` and `N`.
+
+Forward from a slot, each step is a correspondence, which `mu` being a partial map makes unique,
+or the chain ends in `C` or at a returned output. Backward, each step is the inverse of a
+correspondence, unique since `mu` is injective, or the chain ends in `N` or at an input of the
+body. The body is acyclic (spec 10.2, rule 21b), so both directions terminate. []
+
+This is the argument of Lemma 4a, read as a statement about slots rather than about the skeleton
+it computes. It is what licenses deriving provenance from a document without running it: each
+chain is one static identity, its origin is its provenance and its end its fate.
+
+**An origin and an end are static sites (5.7), not run-time identities.** A node that a `map`
+invokes `L` times creates `L` identities at one site; Lemma 8b tells them apart by position. Read
+with Proposition 2c, a faithful run creates each identity at most once and consumes it at most
+once: a creation draws from `U' minus U` and `U` only grows (F3, F4), and a consumed identity
+appears in no output (F2) and, being in `U`, cannot be created again (F3).
 
 ### 15.5 Proposition 2c: conservation on traces
 

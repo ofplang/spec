@@ -9,8 +9,19 @@ specification itself.
 
 ## 0.4 (unreleased)
 
-No normative change yet. The revision is open so that a change has a section to
-land in; until one does, 0.4 holds the rules of 0.3.
+### Changed
+
+- **11, 27 rule 17**: a Pure Data input port bound under `state` is a
+  validation error, the counterpart of the rule that an Object-bearing value
+  must not be passed through `bind`. 0.3 paired the two sections with the two
+  kinds of port but made only that one direction a rule, so a Pure Data value
+  under `state` -- a reference or a literal -- was valid. The section a port
+  takes is now stated to be decided by its declared type, and for a type
+  parameter by its declared domain.
+
+  A 0.3 document that binds a Pure Data input port under `state` moves that
+  binding to `bind`, unchanged otherwise. Nothing else a 0.3 document says
+  changes meaning.
 
 
 ## 0.3 - 2026-09-19

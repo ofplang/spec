@@ -4,7 +4,7 @@ Revision: 0.4 (draft)
 Date: unreleased  
 Supersedes: revision 0.3 (2026-09-19), released and tagged `v0.3`. CHANGELOG.md records what changed and what a document written against 0.3 has to do about it.
 
-A document names the revision it is written against with `spec_version` (2.1). This revision is open and states no change of its own yet, so it holds the rules of 0.3 and a 0.3 document is a valid document under it.
+A document names the revision it is written against with `spec_version` (2.1). This revision is open. It makes the pairing of binding sections with port kinds a rule in both directions (11): 0.3 forbade an Object-bearing value under `bind` but stated the converse only as usage, so a Pure Data value under `state` was valid. A 0.3 document stays valid under it unless it bound a Pure Data input port under `state`.
 
 Revision 0.3 introduced the category of **experimental features** (4.5): a v0 feature whose specification may be changed or removed in a later revision without a migration path, where a feature outside the category would be given one. Stability is what an author relies on when they write against a revision, so a feature still being worked out needs somewhere to live that says so. Without such a place the choice is between shipping nothing and making a promise about to be broken.
 
@@ -1636,7 +1636,11 @@ Example ordinary node invocation:
       from: inputs.pose
 ```
 
-`bind` is Pure Data only. Object-bearing values must not be passed through `bind`.
+`bind` is Pure Data only, and `state` is Object-bearing only. An Object-bearing value must not be passed through `bind`, and a Pure Data input port must not be bound under `state`, whether by a reference or by a literal. Both are validation errors.
+
+Which of the two sections a port takes is decided by the port's declared type: a port whose type has an Object slot (5.2) is bound under `state`, any other port under `bind`. Where the port's type is a type parameter, the parameter's declared domain (8) decides, so the section is known in a generic body before any instantiation.
+
+The rule holds in both directions because the section is the one place a node says what a binding does. A value bound under `state` is used linearly: it is consumed by this invocation and nothing else refers to it. A value bound under `bind` is read, and the same value may be read by any number of invocations. A Pure Data value written under `state` would claim a linearity it does not have, and a reader that takes the section at its word would treat information as material. Nothing is lost by the rule, since `bind` accepts a reference or a literal of any phase.
 
 The binding entries of a node and the input ports of the process it invokes are in one-to-one correspondence. Every input port of the target process must be bound exactly once, across all binding sections valid for the node's kind (21.0), and every binding entry must name an input port of the target process. Both directions are validation errors when they fail: an unbound input port, an input port bound in two sections or twice in one section, and a binding entry that names no input port of the target.
 
@@ -3468,7 +3472,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 15. Object-bearing values are linear: no fan-out, no implicit discard of contained Object slots. Within a composite body, every Object-bearing value -- a composite input port, an ordinary node's output port, or an output a structured node exposes -- is referred to exactly once (12.2).
 16. Object-bearing values are normally `data` phase; rare `run` phase is allowed; `graph` phase is invalid.
 16a. A value may flow from an earlier phase to a later phase but not the reverse; the order is `graph < run < data`. A binding or constant slot (11.2) whose value has a phase later than the port or slot it fills is a validation error.
-17. Ordinary node invocations use `state` for Object-bearing linear inputs and `bind` for Pure Data inputs.
+17. Ordinary node invocations use `state` for Object-bearing linear inputs and `bind` for Pure Data inputs. The port's declared type decides which (for a type parameter, its domain); an Object-bearing value under `bind` and a Pure Data port under `state` are both validation errors.
 18. In `fold` and `do_while`, `carry` is loop-carried and may be Pure Data or Object-bearing.
 19. `branch` uses `args`, not `state`; Object-bearing branch arguments are supplied only to the selected arm. For a `branch`, the correspondence of rule 19a holds against each arm separately.
 18a. Each node kind has a fixed set of valid binding and control sections (21.0); writing another against it is a validation error. `map` has no `outputs` section.

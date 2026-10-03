@@ -7,7 +7,7 @@ This file records what changed and what a document written against the previous
 revision has to do about it. Why a rule is the way it is belongs in the
 specification itself.
 
-## 0.4 (unreleased)
+## 0.4 - 2026-10-03
 
 ### Changed
 

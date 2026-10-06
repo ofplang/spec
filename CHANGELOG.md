@@ -25,6 +25,23 @@ specification itself.
   often it is a misspelled output name). Nothing else a 0.4 document says changes
   meaning.
 
+### Removed
+
+- **23**, **24**, **27 rules 44-48 and 70** the `scheduling_policies` feature:
+  the `scheduling` section of a composite, its temporal references and Object
+  policy targets (**2.6.3**, **2.6.4**), and the `max_gap`, `min_gap` and
+  `temperature` preference kinds. v0 does not treat time; when an operation runs
+  is left to the environment and the plan, and no validation outcome depended on
+  the preferences the section stated. A `scheduling` key is now an unknown key and
+  `scheduling_policies` an unknown feature name, both validation errors. The
+  sections and rules remain as stubs so that the numbering of the rest is
+  unchanged, and `scheduling`, `policies`, `during`, `object` and `to` stay
+  reserved names (**2.4**).
+
+  A 0.4 document that used the section deletes it and removes
+  `scheduling_policies` from `features`. Nothing else in the document depended
+  on it, so nothing else changes meaning.
+
 
 ## 0.4 - 2026-10-03
 

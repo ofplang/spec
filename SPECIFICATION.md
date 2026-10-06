@@ -6,6 +6,8 @@ Supersedes: revision 0.4 (2026-10-03), released and tagged `v0.4`. CHANGELOG.md 
 
 A document names the revision it is written against with `spec_version` (2.1). This revision makes the returns of a composite correspond one to one with its output ports (12.3), the counterpart of the correspondence 11 states between a node's bindings and its target's input ports. 0.4 required a `returns` entry only for an Object-bearing output, through Object tracking completeness (13), so a declared Pure Data output could go unreturned -- and a node that bound it read a value nothing gave -- and a `returns` entry naming no output was not an error at all.
 
+This revision also removes the `scheduling_policies` feature: the `scheduling` section of a composite (23) and Object policy targets (24). v0 does not treat time. When an operation runs, how long an Object waits between operations, and the conditions it is kept in are left to the environment and the plan, and the section stated preferences about them that no validation outcome depended on. A `scheduling` section and the feature name are now validation errors. Sections 23 and 24 and rules 44-48 and 70 remain as stubs so that the numbering of the rest is unchanged, and the names the section used stay reserved (2.4).
+
 Revision 0.4 made the pairing of binding sections with port kinds a rule in both directions (11). 0.3 forbade an Object-bearing value under `bind` but stated the converse only as usage, so a Pure Data value under `state` was valid, and a reader that took the section at its word treated information as material. The section a port takes is now decided by the port's declared type, and for a type parameter by its declared domain.
 
 Revision 0.3 introduced the category of **experimental features** (4.5): a v0 feature whose specification may be changed or removed in a later revision without a migration path, where a feature outside the category would be given one. Stability is what an author relies on when they write against a revision, so a feature still being worked out needs somewhere to live that says so. Without such a place the choice is between shipping nothing and making a promise about to be broken.
@@ -16,7 +18,7 @@ Revision 0.2 stated four conditions that 0.1 relied on without stating: node ids
 
 Revision 0.1 removed the `array_uncons`, `array_cons` and `array_reverse` transform kinds and the `last` output mode, renamed the `elidable_iso` marker to `object_identity_map` and moved it to a process's `behavior` section, added the `array_flatten` and `array_unflatten` transform kinds and the `do_while` node's reserved `exhausted` output, and introduced the Object skeleton (12.4), in terms of which Object tracking completeness, the identity-map marker, a transform's correspondence, a branch's two arms, and a scheduling policy's target are all stated.
 
-This document is a self-contained specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, scheduling policies, and type modeling. Runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
+This document is a self-contained specification for a dataflow-oriented workflow IR with linear Object tracking. It focuses on successful workflow semantics, Object/data flow, structured control, and type modeling. Timing, runtime failures, exceptions, retries, cancellation, compensation, and recovery are intentionally outside the scope of v0.
 
 v0 uses a **Core + Features** model. The canonical v0 form contains a `features` section listing all features required by the document body. If `features` is omitted, the required features are derived from the document body and the document is interpreted as if the derived feature set had been written explicitly.
 
@@ -32,7 +34,7 @@ The key goals of v0 are:
 2. Support structural `$import` for splitting descriptions across files without introducing a module system.
 3. Track Object-bearing values without implicit creation, loss, duplication, discard, or consumption.
 4. Support structured dataflow patterns through explicit feature-gated node kinds.
-5. Keep scheduling policies as best-effort preferences rather than hard semantic obligations.
+5. Leave when operations run to the implementation; v0 states no timing preference or constraint.
 6. Avoid deep subtyping, inheritance, refinement types, Optional, Result, union branch outputs, and dependent typing in v0.
 7. Express common operational grouping through nominal type traits rather than subtyping or parameterized Object types.
 8. Keep contract-visible views and trait membership explicit in YAML, except for v0 built-in primitive and Array views.
@@ -86,7 +88,7 @@ Where the condition does not hold, the workflow still creates finitely many Obje
 
 The condition is a property of atomic processes, which v0 cannot see into. It is stated here rather than as a validation rule for that reason. An implementation may report an atomic `Array` output port that meets neither clause; a document with no such port is one for which this section's guarantee holds.
 
-How many Objects a declaration introduces at a collection port is 14.3; what a scheduling policy then targets is 24.1.
+How many Objects a declaration introduces at a collection port is 14.3.
 
 This principle is weaker than the uniqueness of the Object skeleton (12.4.7). Two descriptions may agree on how many Objects they consume and create and still have different skeletons, if what an output Object's identity comes from is not the same; 12.4.7 forbids that separately.
 
@@ -159,8 +161,7 @@ The processing order is:
 5. Validate the declared `features` section, if present.
 6. Type-check node bindings and structured node outputs.
 7. Check Object tracking completeness and linearity.
-8. Check scheduling policy references and feature requirements.
-9. Resolve the entry process.
+8. Resolve the entry process.
 
 `$import` has no runtime meaning after import resolution.
 
@@ -172,8 +173,6 @@ v0 portable YAML is closed by default. At every defined mapping position, only k
 Implementation extension keys are allowed only when they use the reserved extension-key prefix `x-`. A document containing `x-` extension keys is not strict portable v0 unless the validator is explicitly run in an extension-tolerant mode.
 
 The v0-defined optional `description` key (2.7) is allowed at the document root and at trait, type, and process definition mappings. It is a v0-defined key, not an extension key, so a document using `description` remains strict portable v0.
-
-The `scheduling.policies[*].prefer` payload has a v0-defined closed shape for v0-defined scheduling preference kinds. The `unit` strings inside scheduling preference payloads are implementation-defined strings in v0, and are unrelated to the unit expressions of 28. Extension preference kinds and extension payload fields are allowed only in extension-tolerant mode when they use the reserved extension-key prefix `x-`.
 
 For every mapping position, the specification defines a shape schema consisting of allowed keys, required keys, value kinds, and conditional requirements. A value-kind mismatch, missing required key, unexpected sequence item shape, or unexpected `null` value is a validation error unless explicitly allowed by the relevant schema rule.
 
@@ -265,7 +264,7 @@ exhausted
 units
 ```
 
-Every name in that list but the last is a structural key of the document. `traits` stays reserved as the name of the top-level section that declares type traits (7.3); a process declares its behavior markers under `behavior` (15), which is a different vocabulary. `exhausted` is there for the other reason a name is reserved: a `do_while` node exposes a reserved output of that name (19.3), so were a target process free to declare an output called `exhausted`, a reference to `<node>.exhausted` would name two different values and there would be no way to say which.
+Every name in that list but `exhausted` is a structural key of the document, or was one. `scheduling`, `policies`, `during`, `object` and `to` were keys of the `scheduling` section, which revision 0.5 removed (23); they stay reserved, so that a name the language may use again does not become a process, port or node name in the meantime. `traits` stays reserved as the name of the top-level section that declares type traits (7.3); a process declares its behavior markers under `behavior` (15), which is a different vocabulary. `exhausted` is there for the other reason a name is reserved: a `do_while` node exposes a reserved output of that name (19.3), so were a target process free to declare an output called `exhausted`, a reference to `<node>.exhausted` would name two different values and there would be no way to say which.
 
 Unit atom names occupy a namespace of their own, declared in the top-level `units` section (28.1). The reserved names listed above do not apply to unit atom names, and a unit atom name may coincide with a type name, a trait name, a process name, or a port name.
 
@@ -376,7 +375,7 @@ BodyRef ::= "inputs" "." Identifier | Identifier "." Identifier
 
 The first form refers to an input port of the current composite process. The second form refers to an output of a direct child node in the same composite body.
 
-Body dataflow references must not include `.view`, temporal fields, nested node paths, process names, or `outputs.*`.
+Body dataflow references must not include `.view`, nested node paths, process names, or `outputs.*`.
 
 #### 2.6.2 Atomic Object paths
 
@@ -393,24 +392,11 @@ v0 Object paths refer to process ports. They do not directly address Array eleme
 
 #### 2.6.3 Scheduling Object target references
 
-`scheduling.policies[*].object.from` uses a body-visible Object-bearing value reference:
-
-```text
-PolicyObjectRef ::= "inputs" "." Identifier | Identifier "." Identifier
-```
-
-The referenced value must be Object-bearing in the declaring composite scope.
+Removed in revision 0.5 with the `scheduling` section (23).
 
 #### 2.6.4 Temporal references
 
-`scheduling.policies[*].during.from` and `scheduling.policies[*].during.to` use temporal references:
-
-```text
-TemporalRef ::= "self" "." ("start" | "end")
-              | Identifier "." ("start" | "end")
-```
-
-`self.start` and `self.end` refer to the current composite invocation. `Identifier.start` and `Identifier.end` refer to a direct child node in the current composite body.
+Removed in revision 0.5 with the `scheduling` section (23).
 
 #### 2.6.5 Contract view references
 
@@ -478,9 +464,9 @@ a process definition under processes.<name>
 
 At each of these positions, `description` is optional. If present, its value must be a YAML string scalar. UTF-8 text is allowed, including Japanese. A `null`, sequence, mapping, or non-string scalar value is a validation error, consistent with 2.3.
 
-`description` is metadata only. It does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling policy handling, or runtime behavior. Unlike `spec_version` (2.1), which is checked although it does not select an interpretation, nothing at all is decided by it. Two documents that differ only in `description` values are semantically identical.
+`description` is metadata only. It does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, or runtime behavior. Unlike `spec_version` (2.1), which is checked although it does not select an interpretation, nothing at all is decided by it. Two documents that differ only in `description` values are semantically identical.
 
-v0 does not define `description` on input ports, output ports, type parameters, view fields, nodes, bindings, contracts, scheduling policies, or any mapping position not listed above. The descriptive meaning of a port is expected to be documented in the enclosing process `description`, and the descriptive meaning of a view field in the enclosing type `description`. A `description` key at an undefined position is an unknown-key validation error under 2.3.
+v0 does not define `description` on input ports, output ports, type parameters, view fields, nodes, bindings, contracts, or any mapping position not listed above. The descriptive meaning of a port is expected to be documented in the enclosing process `description`, and the descriptive meaning of a view field in the enclosing type `description`. A `description` key at an undefined position is an unknown-key validation error under 2.3.
 
 Unlike the metadata keys `type`, `value`, and `phase`, the name `description` is intentionally not added to the reserved identifier list (2.4). Because `description` is meaningful only at the definition mappings listed above, it does not conflict with user-defined identifiers used elsewhere, such as a port named `description` or a view field named `description`.
 
@@ -504,7 +490,7 @@ $import:
   - <path>
 ```
 
-`$import` is resolved before validation, type checking, Object tracking completeness checks, feature derivation, scheduling policy checks, and entry process resolution.
+`$import` is resolved before validation, type checking, Object tracking completeness checks, feature derivation, and entry process resolution.
 
 `$import` is structural inclusion, not a module system. It does not introduce namespaces, aliases, selective imports, visibility rules, or re-export semantics.
 
@@ -651,11 +637,12 @@ node_do_while
 node_branch
 generic_processes
 python_script_processes
-scheduling_policies
 units
 ```
 
 `units` is an **experimental** feature (4.5).
+
+`scheduling_policies` was removed in revision 0.5 (23). It is not a v0 feature name, so a `features` section naming it is a validation error (rule 13).
 
 ### 4.3 Feature derivation
 
@@ -683,14 +670,6 @@ A `script` section with `script.language: python` requires:
 ```text
 python_script_processes
 ```
-
-A `scheduling` section requires:
-
-```text
-scheduling_policies
-```
-
-The `scheduling_policies` feature covers both scalar Object policy targets and Object-bearing collection policy targets. No separate `object_collection_policies` feature is defined in v0.
 
 A type expression containing a unit suffix (28.2) requires:
 
@@ -799,7 +778,6 @@ workflow uses kind: fold but implementation lacks node_fold
 workflow uses kind: do_while but implementation lacks node_do_while
 workflow uses kind: branch but implementation lacks node_branch
 workflow uses generic processes but implementation lacks generic_processes
-workflow uses scheduling policies but implementation lacks scheduling_policies
 workflow uses script.language: python but implementation lacks python_script_processes
 workflow uses unit suffixes but implementation lacks units
 ```
@@ -836,7 +814,7 @@ types:
 
 An Object is not merely a record of attributes. It represents a workflow token for something whose identity, use, and lifecycle must be tracked.
 
-v0 tracks physical Object identity and explicit Object creation/consumption. It does not model automatic policy or identity transfer across physical replacement.
+v0 tracks physical Object identity and explicit Object creation/consumption. It does not model automatic identity transfer across physical replacement.
 
 ### 5.2 Object-bearing values
 
@@ -1988,7 +1966,7 @@ every slot of Out(p) is in exactly one of im(phi) and N
 
 Every process and every node must have exactly one skeleton.
 
-Where a construct has several descriptions of which one runs, the skeletons of those descriptions must be equal in the sense of 12.4.3. If they are not, the skeleton is not determined, and the origin of the identity of an output Object slot depends on a choice made at run time. Every place downstream that refers to that Object -- a binding on a later node, a `body.returns` entry, the target of a scheduling policy -- then has no determined answer.
+Where a construct has several descriptions of which one runs, the skeletons of those descriptions must be equal in the sense of 12.4.3. If they are not, the skeleton is not determined, and the origin of the identity of an output Object slot depends on a choice made at run time. Every place downstream that refers to that Object -- a binding on a later node or a `body.returns` entry -- then has no determined answer.
 
 In v0, `branch` is the only construct with several descriptions. Every other has one, so its skeleton is determined by construction. `fold` and `do_while` decide their iteration count at run time, but by 12.4.5 their skeleton does not depend on it.
 
@@ -2083,13 +2061,11 @@ objects:
     - outputs.sample
 ```
 
-This is Object replacement. The created Object is a new physical Object identity. v0 does not treat the created Object as a continuation of the consumed Object for identity, policy, or metadata purposes.
+This is Object replacement. The created Object is a new physical Object identity. v0 does not treat the created Object as a continuation of the consumed Object for identity or metadata purposes.
 
 Object replacement by `consume + create` does not imply `.view` metadata inheritance. The created output Object has its own Object identity and its own type-defined view metadata. Any relationship between the consumed input Object's view metadata and the created output Object's view metadata must be defined by the process's semantics or expressed by contracts.
 
 Structured carry compatibility may allow such replacement when the output has the required same name, type, and phase.
-
-Scheduling policies do not automatically transfer across Object replacement.
 
 ---
 
@@ -2588,8 +2564,6 @@ Where a `fold` carry transition replaces the Object by `consume` + `create` (16)
 
 The over-approximation is sound. The number of Objects is unchanged either way, and a consumption paired with a creation duplicates nothing and loses nothing, so neither linearity nor completeness can be broken by the difference. Skeleton equality is unaffected too, since the skeleton does not depend on the traversal length.
 
-It is also conservative in the direction that matters. A scheduling policy on the carried Object is treated as having ended at the node (24.1), so it stops earlier than it strictly needed to, rather than being applied to an Object it was not meant for.
-
 `do_while` is not affected: it invokes its target at least once (19), so its traversal length is never zero.
 
 If `outputs` is omitted:
@@ -2654,7 +2628,7 @@ If `max_iterations` is reached while the condition remains true, the `do_while` 
 
 Under bounded termination, the standard v0 execution behavior is that the `do_while` node still produces outputs from the invocations that actually ran. Carry outputs expose the final executed invocation's carry outputs. Collected outputs contain all executed invocation outputs in invocation order. If the condition output is collected, the final collected condition value is `true`. The node's reserved `exhausted` output (19.3) is `true`.
 
-An implementation may report bounded termination as a diagnostic, warning, runtime status, policy concern, or runtime concern.
+An implementation may report bounded termination as a diagnostic, warning, runtime status, or runtime concern.
 
 ### 19.1 Do-while output modes
 
@@ -2769,7 +2743,7 @@ Requirements:
 4. Branch outputs are common outputs selected from the executed arm.
 5. One-sided Object-bearing outputs are forbidden in v0.
 6. The two arms must have equal Object skeletons (20.2).
-7. v0 does not provide Optional, Result, union-like branch outputs, conditional Object provenance, or policy transfer semantics.
+7. v0 does not provide Optional, Result, union-like branch outputs, or conditional Object provenance.
 
 If `else` is omitted, it acts as an implicit identity arm for branch arguments for the purpose of Object-bearing common outputs. The implicit else arm returns each Object-bearing branch argument as a same-name Object-bearing output with the same type, phase, and physical identity. It does not implicitly expose Data outputs. Therefore, Data outputs from the `then` arm cannot be exposed as common outputs unless an explicit `else` arm is provided and the corresponding outputs are valid as common Data outputs.
 
@@ -2824,7 +2798,7 @@ A `branch` node has no `objects` section. Its skeleton is derived from the two a
 
 **Where the requirement comes from**
 
-This is 12.4.7 applied to `branch`, which is the only construct in v0 with two descriptions of which one runs. Where the arms' skeletons differ, the node has no determined skeleton, and the origin of the identity of an output Object slot depends on a choice made at run time. Every place downstream that refers to that Object -- a binding on a later node, a `body.returns` entry, the target of a scheduling policy -- then has no determined answer.
+This is 12.4.7 applied to `branch`, which is the only construct in v0 with two descriptions of which one runs. Where the arms' skeletons differ, the node has no determined skeleton, and the origin of the identity of an output Object slot depends on a choice made at run time. Every place downstream that refers to that Object -- a binding on a later node or a `body.returns` entry -- then has no determined answer.
 
 It is also stronger than the principle of 1.1. The two arms may agree on how many Objects they consume and create and still have unequal skeletons, if what an output Object's identity comes from is not the same.
 
@@ -2843,7 +2817,7 @@ the arms use different correspondence kinds for
 
 The second row is what the creation point being a node rather than a process definition decides (12.4.3). Where both arms create, the creation point is this `branch` node in both cases: whichever arm runs, the new Objects appear at this node's output, so where their identity came from does not depend on the arm and the skeletons are equal.
 
-For a collection output the arms need not create the same *number* of Objects. A skeleton names the port and not the size of its slot family (12.4.1), and the normal form carries the port name and the creation point and not a count (12.4.3). Skeleton equality is agreement on provenance, not on count. For the resource consequence see 1.1; for what a policy then targets see 24.1.
+For a collection output the arms need not create the same *number* of Objects. A skeleton names the port and not the size of its slot family (12.4.1), and the normal form carries the port name and the creation point and not a count (12.4.3). Skeleton equality is agreement on provenance, not on count. For the resource consequence see 1.1.
 
 Where `else` is omitted, the implicit arm's skeleton is the identity correspondence from each Object-bearing entry of `args` to the same-name output (12.4.5, 20.3). The `then` arm must therefore have that same skeleton: an arm that consumes or creates an Object needs an explicit `else` that does the same.
 
@@ -2852,14 +2826,6 @@ The last row is not reachable in v0. The only correspondence of kind `order_pres
 **Who checks it**
 
 Skeleton equality is decided statically and the validator checks it. An execution engine assumes it and needs no run-time check.
-
-**Relation to policies**
-
-Because of this requirement, *which value* a scheduling policy targets does not depend on the selected arm. A policy target follows the skeleton (24.1), and equal skeletons give that target the same provenance whichever arm runs.
-
-Where the target is a collection, the number of Object identities it contains may still differ between the arms (12.4.1). A policy applies to each contained identity individually (24.1), so how many identities it applies to is settled at run time. What does not depend on the arm is where those identities came from.
-
-Future versions may introduce an explicit feature for policy transfer semantics across Object replacement or conditional Object provenance. That feature is outside v0. v0 does not infer or perform policy transfer across `consume` / `create`, and branch does not provide conditional policy target semantics.
 
 ### 20.3 Default branch outputs
 
@@ -3065,343 +3031,19 @@ If a script imports a module that is not allowed by the implementation, the IR m
 
 ---
 
-## 23. Feature: `scheduling_policies`
+## 23. Removed: `scheduling_policies`
 
-`scheduling_policies` enables scheduling policy attachment.
+Revision 0.5 removed the `scheduling_policies` feature and the `scheduling` section of a composite process, which attached best-effort preferences on the gap between operations and on the temperature an Object is kept at. The section number is kept so that the sections after it keep theirs.
 
-Scheduling policies are best-effort preferences, not hard semantic requirements.
+v0 states nothing about when an operation runs. A `scheduling` key in a process is a validation error, an unknown key (2.3), and a `features` section naming `scheduling_policies` is one too, an unknown feature name (4.2). A document written against revision 0.4 that used the section is migrated by deleting the section and removing `scheduling_policies` from `features`. No other part of a document depended on it.
 
-They may be used by an implementation for planning, execution guidance, reporting, visualization, or ignored if unsupported.
-
-### 23.1 Temporal references
-
-Policy and contract references are scoped lexically.
-
-Available references:
-
-```text
-self.start
-self.end
-node_id.start
-node_id.end
-```
-
-Rules:
-
-- `self.start` / `self.end` refer to the current composite invocation.
-- `node_id.start` / `node_id.end` refer to direct child nodes in the same composite body scope.
-- Process names are not temporal reference names.
-- Outer nodes, nested composite internals, branch arm internals, and per-iteration internals are not directly referenced from outside.
-- A structured node's `start/end` refers to the whole structured node invocation.
-
-### 23.2 Intervals
-
-Intervals use structured YAML:
-
-```yaml
-during:
-  from: collect.end
-  to: analyze.start
-```
-
-v0 scheduling intervals do not use inline duration-expression syntax. Gap preferences are represented by scheduling preference payloads such as `max_gap` and `min_gap`, using `value` and implementation-defined `unit` strings.
-
-### 23.3 Policy attachment and preference schema
-
-v0 defines a scheduling policy attachment model and a small portable scheduling preference payload schema.
-
-A scheduling policy attaches a v0-defined best-effort preference payload to a temporal interval, and, for Object-targeted policy kinds, to one or more Object identities.
-
-The `scheduling` section is allowed only on composite processes.
-
-The v0 core specification defines:
-
-1. where scheduling policies may appear,
-2. how temporal references such as `self.start`, `self.end`, `node_id.start`, and `node_id.end` are resolved,
-3. how `during` intervals are interpreted,
-4. how `object.from` targets Object identities,
-5. how Object lifetime determines the effective interval of an Object policy,
-6. how Object-bearing collection policy targets are interpreted, and
-7. the portable shape of v0-defined scheduling preference payloads.
-
-A scheduling policy entry is a mapping with the following allowed keys:
-
-```text
-during    required
-object    conditionally allowed or required by preference kind
-prefer    required
-priority  optional
-```
-
-Unknown keys in a scheduling policy entry are validation errors in strict portable v0. In extension-tolerant mode, extension keys using the reserved `x-` prefix are allowed.
-
-The `during` field defines the temporal interval to which the policy is attached.
-
-The `object` field targets one or more Object identities. It is forbidden for `max_gap` and `min_gap` policies. It is required for `temperature` policies.
-
-The `prefer` field must be a closed mapping containing a required `kind` field and the fields required by that preference kind. For v0-defined preference kinds, unknown keys in `prefer` are validation errors.
-
-The `priority` field, if present, must be a YAML integer scalar. If omitted, priority is `0`. Negative priority values are allowed. Larger values indicate stronger preferences. Priority affects only implementation scheduling choices and has no effect on validation, type checking, Object tracking, or workflow semantics. v0 does not define conflict-resolution semantics for priorities.
-
-Policy misses and conflicting scheduling preferences are not validation errors. Conflict resolution is implementation-defined.
-
-### 23.4 Scheduling preference payloads
-
-v0 defines the following portable scheduling preference kinds:
-
-```text
-max_gap
-min_gap
-temperature
-```
-
-The `prefer.kind` field must be a YAML string scalar naming a v0-defined scheduling preference kind. Unknown non-extension preference kinds are validation errors in strict portable v0. In extension-tolerant mode, an implementation-defined preference kind may use a name with the reserved extension-key prefix `x-`.
-
-For all v0-defined scheduling preference kinds, `unit` must be a YAML string scalar containing at least one non-whitespace character. v0 defines only the presence and scalar shape of `unit`. Allowed unit strings, unit conversion rules, dimensional compatibility, normalization, scale interpretation, and conflict handling are implementation-defined.
-
-For all v0-defined scheduling preference kinds, numeric `value` fields must be finite YAML integer or floating-point numeric scalars. `NaN` and infinity values are not valid portable v0 scheduling preference values.
-
-#### 23.4.1 `max_gap`
-
-`max_gap` is a best-effort preference that the operation-to-operation interval identified by `during` should be no longer than the specified non-negative value.
-
-Canonical shape:
-
-```yaml
-prefer:
-  kind: max_gap
-  value: 10
-  unit: min
-```
-
-Schema:
-
-```text
-kind   required, exactly "max_gap"
-value  required, finite non-negative Int or Float
-unit   required, String containing at least one non-whitespace character
-```
-
-A scheduling policy whose `prefer.kind` is `max_gap` must not contain an `object` field. A `max_gap` policy with an `object` field is a validation error.
-
-#### 23.4.2 `min_gap`
-
-`min_gap` is a best-effort preference that the operation-to-operation interval identified by `during` should be at least the specified non-negative value.
-
-Canonical shape:
-
-```yaml
-prefer:
-  kind: min_gap
-  value: 5
-  unit: min
-```
-
-Schema:
-
-```text
-kind   required, exactly "min_gap"
-value  required, finite non-negative Int or Float
-unit   required, String containing at least one non-whitespace character
-```
-
-A scheduling policy whose `prefer.kind` is `min_gap` must not contain an `object` field. A `min_gap` policy with an `object` field is a validation error.
-
-#### 23.4.3 `temperature`
-
-`temperature` is a best-effort environmental preference for targeted Object identities during the effective policy interval.
-
-Canonical shape:
-
-```yaml
-object:
-  from: inputs.sample
-during:
-  from: self.start
-  to: self.end
-prefer:
-  kind: temperature
-  value: 4
-  unit: C
-```
-
-Schema:
-
-```text
-object  required
-kind    required, exactly "temperature"
-value   required, finite Int or Float
-unit    required, String containing at least one non-whitespace character
-```
-
-A scheduling policy whose `prefer.kind` is `temperature` and that does not contain an `object` field is a validation error.
-
-If `temperature` targets an Object-bearing collection, the preference applies individually to each contained Object identity.
-
-For `temperature`, v0 defines only the portable payload shape and Object attachment rule. Allowed unit strings, temperature scale interpretation, tolerance, measurement point, environmental control behavior, resource capability matching, and conflict handling are implementation-defined.
-
-### 23.5 Scheduling policy examples
-
-Operation-to-operation maximum gap preference:
-
-```yaml
-scheduling:
-  policies:
-    - during:
-        from: collect.end
-        to: analyze.start
-      prefer:
-        kind: max_gap
-        value: 10
-        unit: min
-```
-
-Operation-to-operation minimum gap preference:
-
-```yaml
-scheduling:
-  policies:
-    - during:
-        from: wash.end
-        to: incubate.start
-      prefer:
-        kind: min_gap
-        value: 0
-        unit: min
-```
-
-Object-targeted temperature preference:
-
-```yaml
-scheduling:
-  policies:
-    - object:
-        from: inputs.sample
-      during:
-        from: self.start
-        to: self.end
-      prefer:
-        kind: temperature
-        value: -80
-        unit: C
-```
-
-Invalid Object target on a gap preference:
-
-```yaml
-scheduling:
-  policies:
-    - object:
-        from: inputs.sample
-      during:
-        from: collect.end
-        to: analyze.start
-      prefer:
-        kind: max_gap
-        value: 10
-        unit: min
-```
-
-This is invalid because `max_gap` and `min_gap` forbid `object`.
-
-Invalid temperature preference without an Object target:
-
-```yaml
-scheduling:
-  policies:
-    - during:
-        from: freeze.start
-        to: freeze.end
-      prefer:
-        kind: temperature
-        value: -80
-        unit: C
-```
-
-This is invalid because `temperature` requires `object`.
+The names the section used remain reserved (2.4).
 
 ---
 
-## 24. Object Policy Targets
+## 24. Removed: Object Policy Targets
 
-### 24.1 Object policy targets
-
-In `scheduling_policies`, `object.from` may refer to an Atomic Object scalar value or an Object-bearing collection value in the current policy scope.
-
-Example:
-
-```yaml
-object:
-  from: inputs.sample
-```
-
-If `object.from` refers to an Atomic Object scalar value, the policy target is the physical Object identity referred to by that value.
-
-If `object.from` refers to an Object-bearing Array or other Object-bearing collection, the policy target is the set of physical Object identities contained in that value's Object slots. The policy applies to each contained Object identity individually. The policy target is not the Array container value itself.
-
-For `Array<Sample>`, this means:
-
-```text
-object_slots(value) = elements[*]
-```
-
-Which physical Object identities a policy targets is decided by following the Object skeleton (12.4). Tracing the correspondence `phi` gives the identities contained in the value `object.from` names. A slot the skeleton consumes leaves policy tracking at that point.
-
-### 24.2 Object lifetime and effective interval
-
-For policy purposes, an Object is considered available to the workflow from the start of the process that creates or introduces it until the end of the process that consumes or exports it from the current scope.
-
-An Object is introduced into a composite scope when it appears through an Object-bearing input port of that composite invocation, or when it appears through an Object-bearing output port of a direct child node in that scope.
-
-An Object is exported from a composite scope when it is connected to `body.returns`.
-
-An Object leaves policy tracking in the current scope when it is consumed or exported from that scope.
-
-This is a policy interpretation model, not a hard physical existence guarantee.
-
-Effective interval:
-
-```text
-effective_interval = policy.during ∩ object_lifetime
-```
-
-If the effective interval is empty, it is not a validation error; an implementation may report a diagnostic.
-
-### 24.3 Policy tracking through Object flow
-
-Object policies track physical Object identity through `map` and standard `objects.transform`.
-
-`array_flatten` and `array_unflatten` are order-preserving total bijections, so the set of Object identities they contain does not change. A policy targeting `inputs.xss` therefore tracks the same Object identities contained in `outputs.xs`.
-
-As 24.1 says, a policy applies to the Object identities contained in a value rather than to the container, so a change of grouping does not affect what the policy targets.
-
-Policies do not automatically transfer across `consume` / `create` replacement. If policy transfer across physical replacement is needed, it requires explicit policy transfer semantics, which are outside v0.
-
-Future versions may define policy transfer semantics as an explicit feature. Such a feature could describe when and how policies attached to one Object identity transfer to a replacement Object identity. v0 does not define this feature, and no policy transfer is inferred from name, type, view metadata, branch structure, or `consume` / `create` replacement.
-
-For a `fold` node with Object-bearing `each` sources and Object-bearing `mode: collect` outputs, policies follow contained Object identities through the per-iteration target process behavior into collected output Array element slots when those identities are preserved by `map` or standard `objects.transform`. The policy follows Object slots, not the collection container value itself.
-
-### 24.4 Policy scope, nested execution, and non-retroactivity
-
-A scheduling policy applies only to Object identities that are reachable through the referenced `object.from` value while that value is available in the policy's declaring composite scope.
-
-If `object.from` refers to an output of a structured node, the referenced value becomes available in the declaring scope only when the structured node output is produced. The policy does not retroactively apply to Object identities created inside the structured node before that output becomes available in the declaring scope.
-
-This non-retroactivity rule does not prevent policy propagation into nested execution. Once a policy applies to an Object identity in its declaring scope, the policy follows that Object identity through identity-preserving Object flow into nested composite invocations and structured node invocations, for the portion of the policy interval that overlaps the nested execution.
-
-This is forward propagation along already-known Object identity flow, not retroactive policy application. The policy follows Object identity, not variable names, output names, collection container values, or view metadata.
-
-Examples:
-
-- If an outer composite policy targets `inputs.sample`, and `inputs.sample` is passed into a nested composite process, the policy remains applicable to the same Object identity inside the nested composite while the outer policy interval overlaps the nested invocation.
-- If an outer composite policy targets `inputs.samples: Array<Sample>`, and `inputs.samples` is used as a `map` or `fold` `each` source, the policy follows the contained Object identities into the per-element invocations.
-- If an Object-bearing carry value with an active outer policy is passed through `fold` or `do_while`, the policy follows the carry Object identity through identity-preserving carry transitions.
-
-Policies do not automatically transfer across `consume` / `create` replacement in nested execution. If a nested process consumes an Object identity and creates a replacement Object identity, a policy applying to the consumed Object does not apply to the created Object in v0.
-
-A policy declared in an inner composite scope does not escape to the caller and is not exported with returned Object identities. If policy behavior is needed in an outer scope, the outer scope must declare its own policy.
-
-To apply a policy during the internal execution of a structured node to Objects created inside that structured node, the policy must be declared inside the process or composite scope where those created Object identities are available. To apply a policy after structured execution, declare a policy in the enclosing scope targeting the structured node output.
+Revision 0.5 removed Object policy targets with the `scheduling` section (23). The section number is kept.
 
 ---
 
@@ -3427,7 +3069,7 @@ Runtime data errors and runtime verification errors may occur when invocation-ti
 
 For phase-dependent requirements, v0 classifies the error by the earliest phase at which the violation is determined: graph-time validation error, run-start validation or preflight error, or runtime data error. Runtime data errors are outside the core validation semantics of v0, but this specification may still define standard execution behavior for particular runtime data errors.
 
-`do_while` bounded termination is not an IR validation error and is not defined by v0 as a runtime failure. It is a runtime execution condition in which the node terminates by reaching `max_iterations` while the condition output remains `true`. v0 defines the outputs for bounded termination from the invocations that actually ran; implementations may report the condition as a diagnostic, warning, runtime status, policy concern, or runtime concern.
+`do_while` bounded termination is not an IR validation error and is not defined by v0 as a runtime failure. It is a runtime execution condition in which the node terminates by reaching `max_iterations` while the condition output remains `true`. v0 defines the outputs for bounded termination from the invocations that actually ran; implementations may report the condition as a diagnostic, warning, runtime status, or runtime concern.
 
 ---
 
@@ -3437,13 +3079,11 @@ v0 distinguishes portable v0 validation from implementation extensions.
 
 A strict portable v0 document uses only v0-defined syntax, keys, feature names, type syntax, process kinds, node kinds, script languages, and validation semantics.
 
-A validator may provide an extension-tolerant mode. Extension-tolerant mode may accept implementation-defined extension keys and extension scheduling preference kinds or payload fields using the reserved `x-` prefix, but those documents are not strict portable v0 documents unless the extensions are removed.
+A validator may provide an extension-tolerant mode. Extension-tolerant mode may accept implementation-defined extension keys using the reserved `x-` prefix, but those documents are not strict portable v0 documents unless the extensions are removed.
 
 Implementation extension keys must use the reserved prefix `x-`. Unknown keys that do not use the `x-` prefix are validation errors even in extension-tolerant mode.
 
 The v0 core validator does not define the schema or semantics of `x-` extension values. YAML well-formedness, string-key restrictions, duplicate-key restrictions, and import expansion still apply to extension keys and their values.
-
-The `scheduling.policies[*].prefer` payload has a v0-defined closed shape for v0-defined scheduling preference kinds. v0 core validation checks scheduling placement, temporal references, Object targets, Object lifetime interpretation, feature requirements, preference kind names, required preference payload fields, and the scalar shape of preference values and units. The `unit` strings of those payloads, and their conversion semantics, are implementation-defined. They are unrelated to the unit expressions of 28. Extension preference kinds and extension payload fields are allowed only in extension-tolerant mode when they use the reserved `x-` prefix.
 
 A feature name listed in `features` must be either a v0-defined feature name or, in extension-tolerant mode, an implementation-defined extension feature name using the form:
 
@@ -3469,7 +3109,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 3a. Under the `units` feature (28), `Int` and `Float` may carry a unit suffix, which is part of the type: two numeric types with different unit normal forms are different types. Unit atoms are opaque names in their own namespace and must be declared in the top-level `units` section; `Float[1]` is `Float`. No other type may carry a unit suffix.
 4. `$import` provides structural inclusion before validation; it is not a module system and introduces no namespace or aliasing. Import paths should be relative for portability; URI-scheme references are implementation extensions, and URI fragments are not defined in v0.
 5. Imported fragments normally omit reserved metadata; duplicate keys at the same expanded mapping level after import resolution are validation errors.
-6. v0 portable YAML is closed by default; unknown keys are validation errors. Scheduling preference payloads have a v0-defined closed shape for v0-defined preference kinds, while the `unit` strings inside them are implementation-defined and are unrelated to the unit expressions of 28.
+6. v0 portable YAML is closed by default; unknown keys are validation errors.
 7. Implementation extension keys must use the `x-` prefix and are not strict portable v0 unless explicitly accepted by an extension-tolerant validator mode.
 8. `null` values are not valid in v0 portable YAML.
 9. Omitted `units`, `traits`, `types`, `inputs`, and `outputs` are interpreted as empty mappings; `features` may be omitted and derived; `processes` is required.
@@ -3500,7 +3140,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 24. `map` preserves physical identity, and the resolved types of an entry's source and target must match (14.1).
 25. `consume` ends an input Object identity.
 26. `create` introduces a new Object identity at every Object slot of the named output port; for a collection port the declaration does not fix how many (14.3, 12.4.1).
-27. `consume + create` is Object replacement; policy and `.view` metadata do not automatically transfer across replacement.
+27. `consume + create` is Object replacement; `.view` metadata does not automatically transfer across replacement.
 28. v0 standard transforms are `array_flatten` and `array_unflatten`; they have no `params`, require strict role typing, and fix the correspondence between input and output Object slots as an order-preserving total bijection.
 29. `object_identity_map` is a process-level behavior marker and inference permission, declared under a process's `behavior` section; it is not a type trait or a structured-control requirement, and it does not say the process may be skipped.
 30. For Object-bearing Arrays, `object_identity_map` preserves length, nesting, order, and contained Object identities.
@@ -3518,11 +3158,11 @@ Implementations may report validation, portability, unsupported-feature, and ext
 41. `python_script_processes` supports inline `language: python` script processes for Pure Data only; other script languages are not portable v0.
 42. Python script code returns an output-name mapping; `script.returns` is not defined in v0.
 43. Script return mismatches are runtime verification errors unless statically determined.
-44. `scheduling_policies` covers scheduling policy attachment, including scalar Object and Object-bearing collection targets.
-45. Scheduling policies are preferences; policy misses and conflicting preferences are not validation errors. v0 defines the portable `prefer` payload shape for `max_gap`, `min_gap`, and `temperature`; the `unit` strings of those payloads and their conversion semantics are implementation-defined, and are unrelated to the unit expressions of 28. `max_gap` and `min_gap` forbid `object` and require finite non-negative numeric values. `temperature` requires a finite numeric value and requires an `object` target.
-46. `scheduling` is allowed only on composite processes, and temporal references are lexically scoped to the current composite body.
-47. Policies do not apply retroactively to Objects before they become reachable from the declaring scope, but once a policy applies to an Object identity, it follows that identity through identity-preserving flow into nested composite and structured node executions.
-48. Policies declared in inner scopes are not exported to callers, and policies do not transfer across `consume` / `create` replacement in v0.
+44. Removed in revision 0.5 (23).
+45. Removed in revision 0.5 (23).
+46. Removed in revision 0.5 (23).
+47. Removed in revision 0.5 (23).
+48. Removed in revision 0.5 (23).
 49. Runtime failure and exception handling are outside v0.
 50. v0 defines one closed built-in type trait, `Numeric`, satisfied only by `Int` and `Float`; document-defined type traits are declared in top-level `traits`.
 50a. `Numeric` is satisfied only by a numeric primitive type whose unit is dimensionless, so a generic process constrained by `Numeric` does not accept a unit-annotated value.
@@ -3544,9 +3184,9 @@ Implementations may report validation, portability, unsupported-feature, and ext
 65. Type parameters are not instantiated with Array types; collection genericity is written as `Array<T>` or `Array<O>`.
 66. Generic type argument inference and `where` constraint validation are performed during graph validation and do not depend on runtime values.
 67. `where` constraints are string scalar trait constraints of the form `TraitName<T>` or `TraitName< T >`; whitespace before `<` is invalid.
-68. Body dataflow references use only `inputs.<port>` or `<node_id>.<output>`. They do not use `.view`, `outputs.*`, temporal fields, nested node paths, or process names.
+68. Body dataflow references use only `inputs.<port>` or `<node_id>.<output>`. They do not use `.view`, `outputs.*`, nested node paths, or process names.
 69. Atomic Object paths use only `inputs.<port>` and `outputs.<port>`. Object slots and Array elements are derived from the resolved port type, not directly addressed by path syntax.
-70. Scheduling Object targets use body-visible Object-bearing value references. Temporal references use only `self.start`, `self.end`, `<node_id>.start`, and `<node_id>.end`.
+70. Removed in revision 0.5 (23).
 71. Contract expressions may reference only explicit `.view` references. v0 does not omit `.view` even though contracts only refer to views.
 72. A binding source entry must contain exactly one of `from` or `value`.
 73. `branch.condition.from` is a body dataflow reference. `do_while.condition.output` is a target process output name, not a body dataflow reference.
@@ -3562,7 +3202,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 82. Strict portable v0 uses only v0-defined syntax, keys, feature names, type syntax, process kinds, node kinds, script languages, and validation semantics.
 83. Extension-tolerant mode may accept `x-` extension keys and `x-` extension feature names, but unknown non-`x-` keys remain validation errors.
 84. v0 core validation does not accept implementation-defined type constructors, process kinds, node kinds, Object transform kinds, binding sections, output modes, or alternate generic inference semantics; such changes define an extended dialect.
-85. A v0 document may include optional human-readable `description` metadata at the document root and at trait, type, and process definitions. `description` must be a YAML string scalar, is not a reserved identifier name, and does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, scheduling, or runtime behavior.
+85. A v0 document may include optional human-readable `description` metadata at the document root and at trait, type, and process definitions. `description` must be a YAML string scalar, is not a reserved identifier name, and does not affect document interpretation, validation semantics, feature derivation, type checking, Object tracking, or runtime behavior.
 86. The resolved type of a bound value must match the resolved type of the port it is bound to, in every binding section and in `body.returns`. Matching is the structural matching relation of generic instantiation, which reduces to identity of type expressions when no type parameter is involved. An `each` source must be an Array, and it is its element type that is matched against the target input port.
 86a. Binding type match includes the unit: a unit is never added, removed, or converted implicitly, at a binding, a constant slot, a carry, a structured node output, or a generic instantiation. Unit conversion is written as an ordinary atomic process, whose numeric correctness the IR does not check.
 87. A literal binding source (`value`) must conform to its port's declared type, checked exactly as a static view value is checked against a view field type; an integer literal is accepted for a `Float` port. A literal must not be bound to an Object-bearing port.
@@ -3766,9 +3406,7 @@ The unit annotation participates in type identity (28.4) and therefore requires 
 - Structured node outputs (17, 18.1, 19.1, 20.1, summarized in 21): a `map` target output `p: Float[s]` is exposed as `p: Array<Float[s]>`, a collected `fold` or `do_while` output likewise, and a `branch` common output must have the same type in both arms, including its unit.
 - Generic instantiation (8.1): structural matching compares base type and unit normal form. A unit-annotated numeric type is a concrete atomic type of `domain: data`, so a `domain: data` type parameter may be instantiated with one. `Float[s]` and `Float[m]` matched against the same type parameter is a validation error, as any two distinct concrete types would be.
 
-The feature does not interact with Object tracking. A unit suffix may be attached only to the numeric primitive types, which have no Object slots (5.2), so an Object skeleton (12.4) never mentions a unit. Linearity (12.2), Object tracking completeness (13), the `objects` section (14) -- whose every path must name an Object-bearing port -- the `object_identity_map` marker (15), and Object policy targets (24) are all unaffected.
-
-The `unit` string in a `scheduling.policies[*].prefer` payload (23.4) is a separate, implementation-defined string. It is unrelated to the unit expressions defined here and is not validated against them.
+The feature does not interact with Object tracking. A unit suffix may be attached only to the numeric primitive types, which have no Object slots (5.2), so an Object skeleton (12.4) never mentions a unit. Linearity (12.2), Object tracking completeness (13), the `objects` section (14) -- whose every path must name an Object-bearing port -- and the `object_identity_map` marker (15) are all unaffected.
 
 ### 28.8 Literals
 

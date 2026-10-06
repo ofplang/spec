@@ -76,13 +76,12 @@ Proposition I-1, Corollary I-2   the faithfulness triangle   11
 
 ### 0.3 What this document does not cover
 
-`D1` (section 8) erases three layers of a v0 document. Nothing here says anything about
+`D1` (section 8) erases two layers of a v0 document. Nothing here says anything about
 their validity.
 
 ```
 contract expressions          spec 9, spec 28.11, spec 27 rules 79-81, 81a
 view schemas                  spec 7, spec 27 rules 50-58
-scheduling policies           spec 23-24, spec 27 rules 44-48
 portability and extensions    spec 26, spec 27 rules 82-84
 runtime failures              spec 25
 ```
@@ -229,8 +228,10 @@ spec 22                          script outputs are phase: data
 Class C.
 
 ```
-7, 35, 43, 44-48, 50-58, 54a, 70, 71, 74, 75, 79-84, 81a, 89-91
+7, 35, 43, 50-58, 54a, 71, 74, 75, 79-84, 81a, 89-91
 ```
+
+Rules 44-48 and 70 were removed in revision 0.5 with spec 23 and 24, and are stubs.
 
 Four of the summary rules state no validity condition and fall outside the classification.
 Rule 37 describes what a `do_while` produces under bounded termination, which section 10
@@ -239,29 +240,23 @@ exception handling outside v0. Rule 76 is advice on where to draw an Object type
 Rule 92 qualifies the other rules rather than adding one: an obligation classified by phase
 holds only where the implementation determines the condition at that phase.
 
-### 2.3 Class C splits in two
+### 2.3 The order of the checks
 
-Class C is not uniform. Spec 2.2 places the scheduling check (step 8) after Object tracking
-(step 7), because a policy target must be a body-visible Object-bearing value (spec 2.6.3)
-and the set of identities it denotes follows the skeleton (spec 24.1).
-
-```
-C1   checkable independently        contracts, views, portability
-C2   depends on class A             scheduling policy targets, temporal references
-```
+Class C is checkable independently of the core typing. Until revision 0.5 part of it was
+not: the scheduling check read the skeletons, because a policy target followed them. Revision
+0.5 removed scheduling (spec 23), and class C no longer splits.
 
 An implementation therefore proceeds in this order.
 
 ```
 1. D0                    resolve imports
-2. check C1              contracts, views, portability
+2. check C               contracts, views, portability
 3. D1 .. D5              desugar
 4. check A and B         core typing
-5. check C2              scheduling, using the skeletons from step 4
 ```
 
 Proposition 4 is what makes the separation legitimate: erasing the annotations does not
-change the skeleton, so C2 may read a result computed without it.
+change the skeleton, the types, or the phases.
 
 ### 2.4 The trust boundary
 
@@ -586,9 +581,9 @@ allocation-site abstraction of pointer analysis.
 Where a `do_while` carry replaces its Object, `n` iterations create `n` identities, but the
 site is one. Intermediate identities do not appear in the skeleton (Lemma 7).
 
-Nothing in v0 can name them. The four ways a value is named statically are policy targets
-(spec 23.1 does not reach inside a loop body), skeleton equality (compared at node level),
-contracts (`.view`, no identity), and downstream bindings (node output ports only).
+Nothing in v0 can name them. The three ways a value is named statically are skeleton
+equality (compared at node level), contracts (`.view`, no identity), and downstream bindings
+(node output ports only).
 
 `branch` shares one creation point across both arms. **Not because the two need not be
 distinguished, but because they must not be**: separating them would make
@@ -996,12 +991,12 @@ Spec 3. `$import` leaves no trace in the expanded document and has no run-time m
 ### 8.3 D1: erase the annotation layers
 
 ```
-spec_version, features, scheduling, contracts, description, keys beginning with x-
+spec_version, features, contracts, description, keys beginning with x-
 ```
 
 Erasure touches nothing else. `features` restates what the body determines (spec 4.1);
-`spec_version` and `description` are metadata; `scheduling` and `contracts` contribute to
-neither the skeleton, the types, nor the phases.
+`spec_version` and `description` are metadata; `contracts` contribute to neither the
+skeleton, the types, nor the phases.
 
 **Proposition 4 follows from this stage alone** (section 15.1).
 
@@ -1095,8 +1090,7 @@ rule 15, 20.1 rule 1), so `m` is total.
 
 Dependency: `l1 -> l2` when a `from` in a binding or control section (spec 21.0) of `l2` has
 the form `l1.p`. Both `branch.condition` and `do_while.max_iterations` are control sections
-that may carry a `from`. An `inputs.p` reference creates no dependency; `scheduling` is gone,
-so temporal references create none either. The graph is acyclic (spec 10.2, rule 21b).
+that may carry a `from`. An `inputs.p` reference creates no dependency. The graph is acyclic (spec 10.2, rule 21b).
 
 Choose a topological order and emit the let sequence.
 
@@ -1465,11 +1459,11 @@ The proofs are case analyses, so they are only as good as the enumeration behind
 ```
 enumerated   the summary rules of spec 27, each classified
              every occurrence of "validation error", by section
-read in full spec 2, 5, 7, 8, 10, 11, 12, 13, 14, 16-22, 24-27
-scanned      spec 3 (imports), 9 (contracts), 23 (scheduling), the view half of spec 7
+read in full spec 2, 5, 7, 8, 10, 11, 12, 13, 14, 16-22, 25-27
+scanned      spec 3 (imports), 9 (contracts), the view half of spec 7
 ```
 
-The four sections that were only scanned are class B or class C and do not reach the typing
+The three sections that were only scanned are class B or class C and do not reach the typing
 rules. **Every section that can bear on class A was read in full.** Spec 10 is in the list
 because it carries one condition of each kind: the acyclicity of both dependency graphs
 (10.2, rule 21b), which is class A, and the entry process (10.3), which is class B.
@@ -1535,7 +1529,7 @@ and 13.5 cover the rest.
 Three things the specification states are not modelled here.
 
 ```
-spec 13.2   policy and .view do not transfer across replacement    class C
+spec 13.2   .view does not transfer across replacement             class C
 spec 19     diagnostics for bounded termination                    implementation's discretion
 spec 14.1   that an implementation honours its declaration         trust boundary
 ```
@@ -1709,9 +1703,7 @@ its target, so the carry output is the carry input: nothing is consumed and noth
 while the node's skeleton says otherwise (spec 18.2 against spec 12.4.5).
 
 It is sound: the Object count is unchanged either way, and a consumption paired with a creation
-loses and duplicates nothing. It is also conservative in the direction that matters -- a policy
-on the carried Object is treated as having ended at the node, so it stops earlier than needed
-rather than being applied to an Object it was not meant for.
+loses and duplicates nothing.
 
 `do_while` is unaffected: it invokes its target at least once (spec 19), so `n >= 1`.
 
@@ -1743,8 +1735,8 @@ collection element. A creation point is a static site, not a run-time identity.
 
 ### 15.1 Proposition 4: annotations are orthogonal
 
-> With `erase` the removal of `spec_version`, `features`, `scheduling`, `contracts`,
-> `description`, and `x-` keys, for a valid `doc`,
+> With `erase` the removal of `spec_version`, `features`, `contracts`, `description`,
+> and `x-` keys, for a valid `doc`,
 >
 > ```
 > D(doc) = D(erase(doc))
@@ -1988,8 +1980,9 @@ all interleavings agree. The assumption is defensible because v0 observes only f
 a device's motion is not instantaneous, but no intermediate state is observed.
 
 **On the tension with physics.** Proposition 3 is about denotation. Physically, time matters:
-samples degrade, devices are occupied. `scheduling` describes that gap, and Proposition 3 is
-the statement with policies set aside. Proposition 4 is what makes setting them aside legitimate.
+samples degrade, devices are occupied. v0 does not describe that gap: when an operation runs
+is left to the environment and the plan, and revision 0.5 removed the section that stated
+preferences about it (spec 23).
 
 ### 15.8 Proposition 6: features are conservative
 
@@ -2266,9 +2259,9 @@ flow of Objects, not about protocols.
    directly definable; separating terms by phase would triple the rules for a goal outside
    the present scope
 
-3  observational equivalence including scheduling (15.7)
-   Proposition 3 sets policies aside; an equivalence modulo policy satisfaction is where
-   the physical side of this language would be stated
+3  observational equivalence including time (15.7)
+   Proposition 3 is about denotation, and v0 has no construct for time; an equivalence
+   that takes time into account is where the physical side of this language would be stated
 
 4  Proposition 1b (16.3)
    a recognizable axiomatization coinciding with observation

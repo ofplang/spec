@@ -1,10 +1,12 @@
 # Object-flow Programming Language v0 Specification
 
-Revision: 0.4  
-Date: 2026-10-03  
-Supersedes: revision 0.3 (2026-09-19). CHANGELOG.md records what changed and what a document written against 0.3 has to do about it. A 0.3 document stays valid unless it bound a Pure Data input port under `state`, which this revision forbids.
+Revision: 0.5 (draft)  
+Date: unreleased  
+Supersedes: revision 0.4 (2026-10-03), released and tagged `v0.4`. CHANGELOG.md records what changed and what a document written against 0.4 has to do about it.
 
-A document names the revision it is written against with `spec_version` (2.1). This revision makes the pairing of binding sections with port kinds a rule in both directions (11). 0.3 forbade an Object-bearing value under `bind` but stated the converse only as usage, so a Pure Data value under `state` was valid, and a reader that took the section at its word treated information as material. The section a port takes is now decided by the port's declared type, and for a type parameter by its declared domain.
+A document names the revision it is written against with `spec_version` (2.1). This revision is open and states no change of its own yet, so it holds the rules of 0.4 and a 0.4 document is a valid document under it.
+
+Revision 0.4 made the pairing of binding sections with port kinds a rule in both directions (11). 0.3 forbade an Object-bearing value under `bind` but stated the converse only as usage, so a Pure Data value under `state` was valid, and a reader that took the section at its word treated information as material. The section a port takes is now decided by the port's declared type, and for a type parameter by its declared domain.
 
 Revision 0.3 introduced the category of **experimental features** (4.5): a v0 feature whose specification may be changed or removed in a later revision without a migration path, where a feature outside the category would be given one. Stability is what an author relies on when they write against a revision, so a feature still being worked out needs somewhere to live that says so. Without such a place the choice is between shipping nothing and making a promise about to be broken.
 
@@ -97,7 +99,7 @@ An operation whose consumed quantity genuinely varies at run time is expressed b
 A v0 document may contain:
 
 ```yaml
-spec_version: "0.4"
+spec_version: "0.5"
 features: []
 units: {}
 traits: {}
@@ -111,7 +113,7 @@ entry: main
 A v0 document may declare the revision of this specification it is written against, using the top-level `spec_version` field.
 
 ```yaml
-spec_version: "0.4"
+spec_version: "0.5"
 ```
 
 If present, the value must be a string using a two-number version format:
@@ -141,7 +143,7 @@ An earlier MINOR is accepted rather than refused because a revision within one M
 **The current revision**
 
 ```text
-0.4
+0.5
 ```
 
 An implementation states the revision it implements. Two implementations of different revisions may therefore disagree about one document, and the declaration is what makes that disagreement legible rather than silent.

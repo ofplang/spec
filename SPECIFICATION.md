@@ -1,8 +1,8 @@
 # Object-flow Programming Language v0 Specification
 
-Revision: 0.5 (draft)  
-Date: unreleased  
-Supersedes: revision 0.4 (2026-10-03), released and tagged `v0.4`. CHANGELOG.md records what changed and what a document written against 0.4 has to do about it.
+Revision: 0.5  
+Date: 2026-10-06  
+Supersedes: revision 0.4 (2026-10-03). CHANGELOG.md records what changed and what a document written against 0.4 has to do about it. A 0.4 document stays valid unless a composite leaves an output port unreturned or returns a name that is not an output port, or it uses the `scheduling` section, which this revision removes.
 
 A document names the revision it is written against with `spec_version` (2.1). This revision makes the returns of a composite correspond one to one with its output ports (12.3), the counterpart of the correspondence 11 states between a node's bindings and its target's input ports. 0.4 required a `returns` entry only for an Object-bearing output, through Object tracking completeness (13), so a declared Pure Data output could go unreturned -- and a node that bound it read a value nothing gave -- and a `returns` entry naming no output was not an error at all.
 

@@ -4,7 +4,7 @@ Revision: 0.5 (draft)
 Date: unreleased  
 Supersedes: revision 0.4 (2026-10-03), released and tagged `v0.4`. CHANGELOG.md records what changed and what a document written against 0.4 has to do about it.
 
-A document names the revision it is written against with `spec_version` (2.1). This revision is open and states no change of its own yet, so it holds the rules of 0.4 and a 0.4 document is a valid document under it.
+A document names the revision it is written against with `spec_version` (2.1). This revision makes the returns of a composite correspond one to one with its output ports (12.3), the counterpart of the correspondence 11 states between a node's bindings and its target's input ports. 0.4 required a `returns` entry only for an Object-bearing output, through Object tracking completeness (13), so a declared Pure Data output could go unreturned -- and a node that bound it read a value nothing gave -- and a `returns` entry naming no output was not an error at all.
 
 Revision 0.4 made the pairing of binding sections with port kinds a rule in both directions (11). 0.3 forbade an Object-bearing value under `bind` but stated the converse only as usage, so a Pure Data value under `state` was valid, and a reader that took the section at its word treated information as material. The section a port takes is now decided by the port's declared type, and for a type parameter by its declared domain.
 
@@ -764,6 +764,8 @@ map or fold node has no each source
 Object-bearing carry is neither preserved nor replaced by the target process
 node binding names no input port of the target process
 target process input port is not bound, or is bound more than once
+composite output port has no returns entry
+returns entry names no output port of the composite
 do_while node outputs section lists the reserved output exhausted
 zip-equal traversal length mismatch known at graph phase
 unit mismatch between a binding source and its target port
@@ -1847,6 +1849,12 @@ body:
 ```
 
 Here `step.cup` is connected to the composite output port `cup`; it is not unused.
+
+The entries of `body.returns` and the output ports of the composite are in one-to-one correspondence. Every output port must have exactly one `returns` entry, and every `returns` entry must name an output port of the composite. Both directions are validation errors when they fail: an output port with no entry, and an entry that names no output port.
+
+This holds for Pure Data output ports as well as Object-bearing ones, and for the entry process as for any other composite. A declared output is a value the composite says it gives; one with no entry gives nothing, so a node that binds it reads no value and a run of the entry process has no final value to return for it. For an Object-bearing output the requirement also follows from Object tracking completeness (13), which gives every output Object slot a provenance; for a Pure Data output this is the rule that says so. An entry that names no output port is a value returned nowhere, the counterpart of a binding entry that names no input port (11).
+
+Because every composite returns every output it declares, a reference `<node>.<output>` to a node that invokes a composite names a value whenever `<output>` is an output port of that composite (2.6.8).
 
 ### 12.4 Object skeleton
 
@@ -3484,6 +3492,7 @@ Implementations may report validation, portability, unsupported-feature, and ext
 19d. `do_while` requires `max_iterations`, a constant slot (11.2) of slot type `Int` with phase upper bound `run`, whose value is at least 1. A bound of zero or a negative value contradicts the guarantee that the target process is invoked at least once, and is a validation error.
 20. Atomic Object behavior is declared using explicit `inputs.*` / `outputs.*` paths, and every such path must name an Object-bearing port (14).
 21. Composite Object behavior is derived from body graph flow and `returns`, as the composition of the body's node skeletons (12.4.5).
+21c. The `returns` entries of a composite and its output ports are in one-to-one correspondence: every output port, Pure Data or Object-bearing, is returned exactly once, and every `returns` entry names an output port (12.3).
 21a. A process's Object skeleton is the triple of a partial injection from its input Object slots to its output Object slots, the input slots it consumes, and the output slots it creates, each created slot carrying the node at which it is created. Object tracking completeness is completeness of that skeleton (12.4.6), and every process and node must have exactly one (12.4.7).
 21b. Two dependency graphs must be acyclic, and they are different graphs. The process dependency graph is acyclic: a composite must not depend on itself, directly or through others (10.2). Within one composite body, the node dependency graph must also be acyclic; it has an edge from one node to another where a `from` in a binding or control section (21.0) of the second names an output of the first. A cycle in either is a validation error.
 22. All processes must satisfy Object tracking completeness.

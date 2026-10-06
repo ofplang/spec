@@ -9,8 +9,21 @@ specification itself.
 
 ## 0.5 (unreleased)
 
-No normative change yet. The revision is open so that a change has a section to
-land in; until one does, 0.5 holds the rules of 0.4.
+### Changed
+
+- **12.3, 27 rule 21c**: the `returns` entries of a composite and its output
+  ports correspond one to one, for Pure Data outputs as for Object-bearing ones:
+  an output port with no `returns` entry, and a `returns` entry that names no
+  output port, are validation errors. 0.4 required an entry only for an
+  Object-bearing output, through Object tracking completeness (13), so a declared
+  Pure Data output could go unreturned -- and a node binding it read a value
+  nothing gave -- and an entry naming no output was accepted.
+
+  A 0.4 document with a Pure Data output that has no `returns` entry either
+  returns the value it means, or stops declaring the output. One with a `returns`
+  entry that names no output port declares the output, or drops the entry (most
+  often it is a misspelled output name). Nothing else a 0.4 document says changes
+  meaning.
 
 
 ## 0.4 - 2026-10-03

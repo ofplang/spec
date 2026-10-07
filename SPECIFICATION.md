@@ -2889,6 +2889,8 @@ If `outputs` is omitted, the node uses the default output behavior defined for i
 
 If `outputs` is present, only outputs explicitly listed in `outputs` are exposed by the structured node.
 
+Each entry of `outputs` carries a `mode`, one of those its node kind allows (18.1, 19.1, 20.1). The mode is what says whether the listed output is exposed and, if it is, as what type (below), so an entry without one says neither and is a validation error -- for every node kind, including a `branch`, whose unlisted Data outputs are dropped but whose listed ones say which.
+
 An exposed output is an ordinary body-visible value: another node may bind it, and `body.returns` may return it. Its resolved type — which binding type compatibility (11.1) is checked against — follows from the mode, given a target process output `p: T`:
 
 ```text
